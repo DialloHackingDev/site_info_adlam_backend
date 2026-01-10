@@ -271,3 +271,152 @@ exports.validateLikeCheck = (req, res, next) => {
 
   next();
 };
+
+/**
+ * Validation spécifique pour les e-books
+ */
+exports.validateEbook = (req, res, next) => {
+  const { title, description, author, price, category } = req.body;
+
+  // Validation des champs requis
+  if (!title || !description || !author || !category) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Titre, description, auteur et catégorie sont obligatoires'
+    });
+  }
+
+  // Validation des types
+  if (typeof title !== 'string' || typeof description !== 'string' || 
+      typeof author !== 'string' || typeof category !== 'string') {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Types de données invalides'
+    });
+  }
+
+  // Validation du prix
+  if (price !== undefined) {
+    const priceNum = parseFloat(price);
+    if (isNaN(priceNum) || priceNum < 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Le prix doit être un nombre positif'
+      });
+    }
+  }
+
+  // Validation des catégories autorisées
+  const allowedCategories = ['litterature', 'histoire', 'education', 'culture', 'science', 'religion', 'enfants'];
+  if (!allowedCategories.includes(category)) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Catégorie non valide'
+    });
+  }
+
+  // Validation de la longueur
+  if (title.trim().length > 200) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Le titre ne peut pas dépasser 200 caractères'
+    });
+  }
+
+  if (description.trim().length > 2000) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'La description ne peut pas dépasser 2000 caractères'
+    });
+  }
+
+  if (author.trim().length > 100) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Le nom de l\'auteur ne peut pas dépasser 100 caractères'
+    });
+  }
+
+  next();
+};
+
+/**
+ * Validation pour la mise à jour d'e-books
+ */
+exports.validateEbookUpdate = (req, res, next) => {
+  const { title, description, author, price, category } = req.body;
+
+  // Validation des types si fournis
+  if (title && typeof title !== 'string') {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Le titre doit être une chaîne de caractères'
+    });
+  }
+
+  if (description && typeof description !== 'string') {
+    return res.status(400).json({
+      status: 'error',
+      message: 'La description doit être une chaîne de caractères'
+    });
+  }
+
+  if (author && typeof author !== 'string') {
+    return res.status(400).json({
+      status: 'error',
+      message: 'L\'auteur doit être une chaîne de caractères'
+    });
+  }
+
+  if (category) {
+    if (typeof category !== 'string') {
+      return res.status(400).json({
+        status: 'error',
+        message: 'La catégorie doit être une chaîne de caractères'
+      });
+    }
+
+    const allowedCategories = ['litterature', 'histoire', 'education', 'culture', 'science', 'religion', 'enfants'];
+    if (!allowedCategories.includes(category)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Catégorie non valide'
+      });
+    }
+  }
+
+  // Validation du prix
+  if (price !== undefined) {
+    const priceNum = parseFloat(price);
+    if (isNaN(priceNum) || priceNum < 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Le prix doit être un nombre positif'
+      });
+    }
+  }
+
+  // Validation de la longueur
+  if (title && title.trim().length > 200) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Le titre ne peut pas dépasser 200 caractères'
+    });
+  }
+
+  if (description && description.trim().length > 2000) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'La description ne peut pas dépasser 2000 caractères'
+    });
+  }
+
+  if (author && author.trim().length > 100) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Le nom de l\'auteur ne peut pas dépasser 100 caractères'
+    });
+  }
+
+  next();
+};

@@ -13,7 +13,9 @@ const {
   validateComment,
   validateCommentUpdate,
   validateModerationAction,
-  validateLikeCheck
+  validateLikeCheck,
+  validateEbook,
+  validateEbookUpdate
 } = require('./validation');
 
 // Sécurité
@@ -27,7 +29,9 @@ const {
 const {
   uploadCoverImage,
   uploadOptionalImage,
-  validateImageDimensions
+  validateImageDimensions,
+  uploadEbookFiles,
+  uploadOptionalEbookFiles
 } = require('./upload');
 
 module.exports = {
@@ -49,6 +53,8 @@ module.exports = {
   validateCommentUpdate,
   validateModerationAction,
   validateLikeCheck,
+  validateEbook,
+  validateEbookUpdate,
   
   // Sécurité
   validateContentType,
@@ -58,5 +64,7 @@ module.exports = {
   // Upload
   uploadCoverImage,
   uploadOptionalImage,
-  validateImageDimensions
+  validateImageDimensions,
+  uploadEbookFiles,
+  uploadOptionalEbookFiles
 };

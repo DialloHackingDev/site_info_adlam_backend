@@ -13,6 +13,7 @@ const authRouter = require('./routes/user.route');
 const articleRouter = require('./routes/article.route');
 const commentRouter = require('./routes/comment.route');
 const likeRouter = require('./routes/like.route');
+const ebookRouter = require('./routes/ebook.route');
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/articles', articleRouter);
 app.use('/api/v1/comments', commentRouter);
 app.use('/api/v1/likes', likeRouter);
+app.use('/api/v1/ebooks', ebookRouter);
 
 // Route de test
 app.get('/api/v1/health', (req, res) => {
@@ -44,6 +46,7 @@ app.get('/api/v1/health', (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+
 
 
 
