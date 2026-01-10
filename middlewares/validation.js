@@ -133,16 +133,140 @@ exports.validateArticleUpdate = (req, res, next) => {
 };
 
 /**
- * Validation pour les actions de like
+ * Validation spécifique pour les commentaires
  */
-exports.validateLikeAction = (req, res, next) => {
-  const { action } = req.body;
+exports.validateComment = (req, res, next) => {
+  const { content, articleId, parentCommentId } = req.body;
 
-  if (!action || !['like', 'unlike'].includes(action)) {
+  // Validation du contenu
+  if (!content || typeof content !== 'string') {
     return res.status(400).json({
       status: 'error',
-      message: 'Action doit être "like" ou "unlike"'
+      message: 'Le contenu du commentaire est obligatoire'
     });
+  }
+
+  if (content.trim().length < 3) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Le commentaire doit contenir au moins 3 caractères'
+    });
+  }
+
+  if (content.length > 1000) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Le commentaire ne peut pas dépasser 1000 caractères'
+    });
+  }
+
+  // Validation de l'ID de l'article
+  if (!articleId || typeof articleId !== 'string') {
+    return res.status(400).json({
+      status: 'error',
+      message: 'ID de l\'article requis'
+    });
+  }
+
+  // Validation de l'ID du commentaire parent (optionnel)
+  if (parentCommentId && typeof parentCommentId !== 'string') {
+    return res.status(400).json({
+      status: 'error',
+      message: 'ID du commentaire parent invalide'
+    });
+  }
+
+  next();
+};
+
+/**
+ * Validation pour la mise à jour de commentaire
+ */
+exports.validateCommentUpdate = (req, res, next) => {
+  const { content } = req.body;
+
+  if (!content || typeof content !== 'string') {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Le contenu du commentaire est obligatoire'
+    });
+  }
+
+  if (content.trim().length < 3) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Le commentaire doit contenir au moins 3 caractères'
+    });
+  }
+
+  if (content.length > 1000) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Le commentaire ne peut pas dépasser 1000 caractères'
+    });
+  }
+
+  next();
+};
+
+/**
+ * Validation pour les actions de modération
+ */
+exports.validateModerationAction = (req, res, next) => {
+  const { action } = req.body;
+
+  if (!action || !['approve', 'reject', 'spam'].includes(action)) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Action doit être approve, reject ou spam'
+    });
+  }
+
+  next();
+};
+
+/**
+ * Validation pour la vérification des likes
+ */
+exports.validateLikeCheck = (req, res, next) => {
+  const { targets } = req.body;
+
+  if (!Array.isArray(targets)) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Targets doit être un tableau'
+    });
+  }
+
+  if (targets.length === 0) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Au moins un élément à vérifier requis'
+    });
+  }
+
+  if (targets.length > 100) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Maximum 100 éléments par requête'
+    });
+  }
+
+  // Valider chaque target
+  for (const target of targets) {
+    if (!target.type || !target.id) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Chaque target doit avoir un type et un id'
+      });
+    }
+
+    if (!['Article', 'Comment'].includes(target.type)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Type doit être Article ou Comment'
+      });
+    }
   }
 
   next();

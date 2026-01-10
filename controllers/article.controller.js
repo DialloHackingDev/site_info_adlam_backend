@@ -1,4 +1,6 @@
 const Article = require('../models/article.model');
+const schedulerService = require('../services/scheduler.service');
+const { deleteImage, extractPublicId } = require('../config/cloudinary');
 
 // Créer un article
 exports.createArticle = async (req, res) => {
@@ -10,11 +12,11 @@ exports.createArticle = async (req, res) => {
       category,
       tags,
       status,
-      coverImage,
       metaTitle,
       metaDescription,
       keywords,
-      scheduledAt
+      scheduledAt,
+      featured
     } = req.body;
 
     const articleData = {
@@ -25,14 +27,30 @@ exports.createArticle = async (req, res) => {
       excerpt,
       tags: Array.isArray(tags) ? tags : [],
       status: status || 'draft',
-      coverImage,
       metaTitle,
       metaDescription,
-      keywords: Array.isArray(keywords) ? keywords : []
+      keywords: Array.isArray(keywords) ? keywords : [],
+      featured: featured || false
     };
 
+    // Gestion de l'image de couverture
+    if (req.body.coverImage) {
+      articleData.coverImage = req.body.coverImage;
+      if (req.uploadedImagePublicId) {
+        articleData.coverImagePublicId = req.uploadedImagePublicId;
+      }
+    }
+
+    // Gestion de la planification
     if (scheduledAt && status === 'scheduled') {
-      articleData.scheduledAt = new Date(scheduledAt);
+      const scheduledDate = new Date(scheduledAt);
+      if (scheduledDate <= new Date()) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'La date de planification doit être dans le futur'
+        });
+      }
+      articleData.scheduledAt = scheduledDate;
     }
 
     const article = await Article.create(articleData);
@@ -40,9 +58,14 @@ exports.createArticle = async (req, res) => {
 
     res.status(201).json({
       status: 'success',
-      data: { article }
+      data: { article: article.getPublicData() }
     });
   } catch (error) {
+    // Supprimer l'image uploadée en cas d'erreur
+    if (req.uploadedImagePublicId) {
+      await deleteImage(req.uploadedImagePublicId).catch(console.error);
+    }
+    
     if (error.code === 11000) {
       return res.status(400).json({
         status: 'error',
@@ -203,6 +226,7 @@ exports.updateArticle = async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
+    const oldImagePublicId = req.resource?.coverImagePublicId;
 
     const article = await Article.findById(id);
 
@@ -221,6 +245,30 @@ exports.updateArticle = async (req, res) => {
       });
     }
 
+    // Gestion de l'image de couverture
+    if (req.body.coverImage && req.body.coverImage !== article.coverImage) {
+      updates.coverImage = req.body.coverImage;
+      if (req.uploadedImagePublicId) {
+        updates.coverImagePublicId = req.uploadedImagePublicId;
+        
+        // Supprimer l'ancienne image
+        if (oldImagePublicId) {
+          await deleteImage(oldImagePublicId).catch(console.error);
+        }
+      }
+    }
+
+    // Gestion de la planification
+    if (updates.scheduledAt && updates.status === 'scheduled') {
+      const scheduledDate = new Date(updates.scheduledAt);
+      if (scheduledDate <= new Date()) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'La date de planification doit être dans le futur'
+        });
+      }
+    }
+
     const updatedArticle = await Article.findByIdAndUpdate(
       id,
       updates,
@@ -229,7 +277,7 @@ exports.updateArticle = async (req, res) => {
 
     res.status(200).json({
       status: 'success',
-      data: { article: updatedArticle }
+      data: { article: updatedArticle.getPublicData() }
     });
   } catch (error) {
     res.status(400).json({
@@ -259,6 +307,11 @@ exports.deleteArticle = async (req, res) => {
         status: 'error',
         message: 'Non autorisé à supprimer cet article'
       });
+    }
+
+    // Supprimer l'image de couverture si elle existe
+    if (article.coverImagePublicId) {
+      await deleteImage(article.coverImagePublicId).catch(console.error);
     }
 
     await Article.findByIdAndDelete(id);
@@ -335,7 +388,7 @@ exports.getArticlesByCategory = async (req, res) => {
 exports.toggleLike = async (req, res) => {
   try {
     const { id } = req.params;
-    const { action } = req.body; // 'like' ou 'unlike'
+    const ipAddress = req.ip || req.connection.remoteAddress;
 
     const article = await Article.findById(id);
 
@@ -353,14 +406,167 @@ exports.toggleLike = async (req, res) => {
       });
     }
 
-    const increment = action === 'like';
-    await article.toggleLike(increment);
+    // Utiliser le service Like pour gérer les likes
+    const Like = require('../models/like.model');
+    const result = await Like.toggleLike(req.user._id, 'Article', id, ipAddress);
+
+    res.status(200).json({
+      status: 'success',
+      data: result
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+};
+
+// Nouvelles fonctionnalités avancées
+
+// Obtenir les articles en vedette
+exports.getFeaturedArticles = async (req, res) => {
+  try {
+    const { limit = 3 } = req.query;
+    const articles = await Article.getFeatured(parseInt(limit));
+
+    res.status(200).json({
+      status: 'success',
+      results: articles.length,
+      data: { articles: articles.map(article => article.getPublicData()) }
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+};
+
+// Obtenir les articles populaires
+exports.getPopularArticles = async (req, res) => {
+  try {
+    const { limit = 5, days = 7 } = req.query;
+    const articles = await Article.getPopular(parseInt(limit), parseInt(days));
+
+    res.status(200).json({
+      status: 'success',
+      results: articles.length,
+      data: { articles: articles.map(article => article.getPublicData()) }
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+};
+
+// Basculer le statut featured d'un article
+exports.toggleFeatured = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const article = await Article.findById(id);
+
+    if (!article) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Article non trouvé'
+      });
+    }
+
+    await article.toggleFeatured();
 
     res.status(200).json({
       status: 'success',
       data: {
-        likes: article.likes,
-        action
+        featured: article.featured,
+        message: `Article ${article.featured ? 'ajouté aux' : 'retiré des'} articles en vedette`
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+};
+
+// Planifier un article
+exports.scheduleArticle = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { scheduledAt } = req.body;
+
+    if (!scheduledAt) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Date de planification requise'
+      });
+    }
+
+    const scheduledDate = new Date(scheduledAt);
+    if (scheduledDate <= new Date()) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'La date de planification doit être dans le futur'
+      });
+    }
+
+    const article = await schedulerService.scheduleArticle(id, scheduledDate);
+
+    res.status(200).json({
+      status: 'success',
+      data: { article: article.getPublicData() }
+    });
+  } catch (error) {
+    res.status(400).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+};
+
+// Annuler la planification
+exports.unscheduleArticle = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const article = await schedulerService.unscheduleArticle(id);
+
+    res.status(200).json({
+      status: 'success',
+      data: { article: article.getPublicData() }
+    });
+  } catch (error) {
+    res.status(400).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+};
+
+// Obtenir les statistiques des articles
+exports.getArticleStats = async (req, res) => {
+  try {
+    const [categoryStats, scheduledStats] = await Promise.all([
+      Article.getCategoryStats(),
+      Article.getScheduledStats()
+    ]);
+
+    const totalPublished = await Article.countDocuments({ status: 'published' });
+    const totalDrafts = await Article.countDocuments({ status: 'draft' });
+    const totalScheduled = scheduledStats[0]?.total || 0;
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        overview: {
+          totalPublished,
+          totalDrafts,
+          totalScheduled
+        },
+        categoryStats,
+        scheduledStats: scheduledStats[0] || { total: 0, nextScheduled: null }
       }
     });
   } catch (error) {

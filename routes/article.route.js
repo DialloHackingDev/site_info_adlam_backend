@@ -8,7 +8,9 @@ const {
   validateArticle,
   validateArticleUpdate,
   validateLikeAction,
-  sanitizeInput
+  sanitizeInput,
+  uploadCoverImage,
+  uploadOptionalImage
 } = require('../middlewares');
 
 const router = express.Router();
@@ -19,6 +21,8 @@ router.use(sanitizeInput);
 
 // Routes publiques
 router.get('/recent', articleController.getRecentArticles);
+router.get('/featured', articleController.getFeaturedArticles);
+router.get('/popular', articleController.getPopularArticles);
 router.get('/category/:category', articleController.getArticlesByCategory);
 
 // Routes avec authentification optionnelle
@@ -29,12 +33,16 @@ router.get('/slug/:slug', optionalAuth, articleController.getArticleBySlug);
 router.use(protect);
 
 // Liker un article (utilisateurs connectés)
-router.patch('/:id/like', validateLikeAction, articleController.toggleLike);
+router.patch('/:id/like', articleController.toggleLike);
 
 // Routes admin uniquement
-router.post('/', adminOnly, validateArticle, articleController.createArticle);
+router.post('/', adminOnly, uploadCoverImage, validateArticle, articleController.createArticle);
+router.get('/stats', adminOnly, articleController.getArticleStats);
 router.get('/:id', adminOnly, articleController.getArticleById);
-router.patch('/:id', adminOnly, validateArticleUpdate, articleController.updateArticle);
+router.patch('/:id', adminOnly, uploadOptionalImage, validateArticleUpdate, articleController.updateArticle);
+router.patch('/:id/featured', adminOnly, articleController.toggleFeatured);
+router.patch('/:id/schedule', adminOnly, articleController.scheduleArticle);
+router.patch('/:id/unschedule', adminOnly, articleController.unscheduleArticle);
 router.delete('/:id', adminOnly, articleController.deleteArticle);
 
 module.exports = router;

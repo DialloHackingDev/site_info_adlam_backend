@@ -4,12 +4,15 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const { validateContentType, limitRequestSize } = require('./middlewares');
+const schedulerService = require('./services/scheduler.service');
 
 // Connexion à la base de données
 require('./config/db');
 
 const authRouter = require('./routes/user.route');
 const articleRouter = require('./routes/article.route');
+const commentRouter = require('./routes/comment.route');
+const likeRouter = require('./routes/like.route');
 
 const app = express();
 
@@ -30,6 +33,8 @@ app.use(cookieParser());
 // Routes
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/articles', articleRouter);
+app.use('/api/v1/comments', commentRouter);
+app.use('/api/v1/likes', likeRouter);
 
 // Route de test
 app.get('/api/v1/health', (req, res) => {
@@ -53,5 +58,21 @@ app.use((error, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`server demarre sur le port ${PORT}`);
+  console.log(`Server started on port ${PORT}`);
+  
+  // Démarrer le scheduler des articles planifiés
+  schedulerService.start();
+});
+
+// Arrêter proprement le scheduler lors de l'arrêt du serveur
+process.on('SIGTERM', () => {
+  console.log('SIGTERM reçu, arrêt du serveur...');
+  schedulerService.stop();
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT reçu, arrêt du serveur...');
+  schedulerService.stop();
+  process.exit(0);
 });

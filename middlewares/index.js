@@ -9,7 +9,11 @@ const {
   validateInput, 
   validateArticle, 
   validateArticleUpdate, 
-  validateLikeAction 
+  validateLikeAction,
+  validateComment,
+  validateCommentUpdate,
+  validateModerationAction,
+  validateLikeCheck
 } = require('./validation');
 
 // Sécurité
@@ -18,6 +22,13 @@ const {
   limitRequestSize, 
   sanitizeInput 
 } = require('./security');
+
+// Upload
+const {
+  uploadCoverImage,
+  uploadOptionalImage,
+  validateImageDimensions
+} = require('./upload');
 
 module.exports = {
   // Authentification
@@ -34,9 +45,18 @@ module.exports = {
   validateArticle,
   validateArticleUpdate,
   validateLikeAction,
+  validateComment,
+  validateCommentUpdate,
+  validateModerationAction,
+  validateLikeCheck,
   
   // Sécurité
   validateContentType,
   limitRequestSize,
-  sanitizeInput
+  sanitizeInput,
+  
+  // Upload
+  uploadCoverImage,
+  uploadOptionalImage,
+  validateImageDimensions
 };
