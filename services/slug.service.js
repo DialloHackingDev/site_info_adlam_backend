@@ -8,9 +8,13 @@ class SlugService {
    * Génère un slug à partir d'un titre
    */
   static generateSlug(title) {
+    if (!title) return 'article';
+    
     return title
       .toLowerCase()
       .trim()
+      // Convertir les caractères Adlam en translittération ou utiliser un identifiant simple
+      .replace(/\u{1E900}-\u{1E95F}/gu, 'adlam')
       // Remplacer les caractères spéciaux par des tirets
       .replace(/[^a-z0-9\s-]/g, '')
       // Remplacer les espaces multiples par un seul tiret
@@ -18,23 +22,31 @@ class SlugService {
       // Remplacer les tirets multiples par un seul
       .replace(/-+/g, '-')
       // Supprimer les tirets en début et fin
-      .replace(/^-+|-+$/g, '');
+      .replace(/^-+|-+$/g, '')
+      // Si le slug est vide, utiliser un défaut
+      || 'article';
   }
 
   /**
    * Génère un slug unique en vérifiant la base de données
    */
   static async generateUniqueSlug(title, excludeId = null) {
-    let baseSlug = this.generateSlug(title);
-    let slug = baseSlug;
-    let counter = 1;
+    try {
+      let baseSlug = this.generateSlug(title);
+      let slug = baseSlug;
+      let counter = 1;
 
-    while (await this.slugExists(slug, excludeId)) {
-      slug = `${baseSlug}-${counter}`;
-      counter++;
+      while (await this.slugExists(slug, excludeId)) {
+        slug = `${baseSlug}-${counter}`;
+        counter++;
+      }
+
+      return slug;
+    } catch (error) {
+      console.error('Error generating unique slug:', error);
+      // Fallback: générer un slug avec timestamp
+      return `article-${Date.now()}`;
     }
-
-    return slug;
   }
 
   /**

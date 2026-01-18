@@ -1,24 +1,66 @@
 const express = require('express');
 const adminController = require('../controllers/admin.controller');
-const { protect, adminOnly, validateInput, sanitizeInput } = require('../middlewares');
+const { protect, adminOnly } = require('../middlewares');
+const multer = require('multer');
+const path = require('path');
 
 const router = express.Router();
 
-// Middleware global - Seuls les admins peuvent accéder
+// Configuration multer pour l'upload de fichiers
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/');
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + '-' + Math.round(Math.random() * 1E9) + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ 
+  storage,
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+  fileFilter: (req, file, cb) => {
+    if (file.fieldname === 'coverImage') {
+      if (file.mimetype.startsWith('image/')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Seules les images sont autorisées pour la couverture'));
+      }
+    } else if (file.fieldname === 'pdfFile') {
+      if (file.mimetype === 'application/pdf') {
+        cb(null, true);
+      } else {
+        cb(new Error('Seuls les fichiers PDF sont autorisés'));
+      }
+    } else {
+      cb(null, true);
+    }
+  }
+});
+
+// Middleware pour toutes les routes admin
 router.use(protect);
 router.use(adminOnly);
-router.use(validateInput);
-router.use(sanitizeInput);
 
-// Dashboard
-router.get('/dashboard', adminController.getDashboardStats);
+// Routes dashboard
+router.get('/stats', adminController.getDashboardStats);
 
-// Gestion des utilisateurs
-router.get('/users', adminController.getAllUsers);
-router.put('/users/:id/role', adminController.updateUserRole);
-router.delete('/users/:id', adminController.deleteUser);
+// Routes articles
+router.post('/articles', upload.single('coverImage'), adminController.createArticle);
+router.patch('/articles/:id', upload.single('coverImage'), adminController.updateArticle);
+router.delete('/articles/:id', adminController.deleteArticle);
 
-// Gestion des contenus
-router.get('/content', adminController.getAllContent);
+// Routes e-books
+router.post('/ebooks', upload.fields([
+  { name: 'coverImage', maxCount: 1 },
+  { name: 'pdfFile', maxCount: 1 }
+]), adminController.createEbook);
+
+router.patch('/ebooks/:id', upload.fields([
+  { name: 'coverImage', maxCount: 1 },
+  { name: 'pdfFile', maxCount: 1 }
+]), adminController.updateEbook);
+
+router.delete('/ebooks/:id', adminController.deleteEbook);
 
 module.exports = router;

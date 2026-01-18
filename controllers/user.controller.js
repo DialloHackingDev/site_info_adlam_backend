@@ -65,6 +65,7 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    console.log('Login attempt for:', email);
 
     // Validation des types pour prévenir l'injection NoSQL
     if (!email || !password || 
@@ -77,6 +78,8 @@ exports.login = async (req, res) => {
     }
 
     const user = await User.findOne({ email }).select('+password');
+    console.log('User found:', user ? 'Yes' : 'No');
+    
     if (!user) {
       return res.status(401).json({
         status: 'error',
@@ -84,13 +87,15 @@ exports.login = async (req, res) => {
       });
     }
     
+    console.log('Comparing passwords...');
     const verifyPassword = await user.comparePassword(password);
+    console.log('Password valid:', verifyPassword);
+    
     if (!verifyPassword) {
       return res.status(401).json({
         status: 'error',
         message: 'Email ou mot de passe incorrect'
       });
-      
     }
 
     const token = signToken(user._id);
@@ -117,11 +122,11 @@ exports.login = async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('Login error details:', error);
     res.status(500).json({
       status: 'error',
       message: 'Erreur serveur lors de la connexion'
     });
-    console.log(error)
   }
 };
 

@@ -101,35 +101,32 @@ articleSchema.index({ slug: 1 });
 
 // Middleware pour générer le slug automatiquement
 articleSchema.pre('save', async function(next) {
-  // Générer le slug si nouveau ou titre modifié
-  if (this.isNew || this.isModified('title')) {
-    if (!this.slug || this.isModified('title')) {
-      this.slug = await SlugService.generateUniqueSlug(this.title, this._id);
+  try {
+    // Calculer le temps de lecture (250 mots par minute)
+    if (this.isModified('content')) {
+      const wordCount = this.content.split(/\s+/).length;
+      this.readingTime = Math.ceil(wordCount / 250);
     }
+    
+    // Générer l'extrait automatiquement si pas fourni
+    if (this.isModified('content') && !this.excerpt) {
+      this.excerpt = this.content.replace(/<[^>]*>/g, '').substring(0, 300) + '...';
+    }
+    
+    // Définir publishedAt si le statut passe à published
+    if (this.isModified('status') && this.status === 'published' && !this.publishedAt) {
+      this.publishedAt = new Date();
+    }
+    
+    // Nettoyer scheduledAt si le statut n'est plus scheduled
+    if (this.isModified('status') && this.status !== 'scheduled') {
+      this.scheduledAt = null;
+    }
+    
+    next();
+  } catch (error) {
+    next(error);
   }
-  
-  // Calculer le temps de lecture (250 mots par minute)
-  if (this.isModified('content')) {
-    const wordCount = this.content.split(/\s+/).length;
-    this.readingTime = Math.ceil(wordCount / 250);
-  }
-  
-  // Générer l'extrait automatiquement si pas fourni
-  if (this.isModified('content') && !this.excerpt) {
-    this.excerpt = this.content.replace(/<[^>]*>/g, '').substring(0, 300) + '...';
-  }
-  
-  // Définir publishedAt si le statut passe à published
-  if (this.isModified('status') && this.status === 'published' && !this.publishedAt) {
-    this.publishedAt = new Date();
-  }
-  
-  // Nettoyer scheduledAt si le statut n'est plus scheduled
-  if (this.isModified('status') && this.status !== 'scheduled') {
-    this.scheduledAt = null;
-  }
-  
-  next();
 });
 
 // Méthodes d'instance
