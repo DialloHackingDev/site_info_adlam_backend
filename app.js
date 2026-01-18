@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const morgan = require("morgan");
 const cookieParser = require('cookie-parser');
 const { validateContentType, limitRequestSize } = require('./middlewares');
 const schedulerService = require('./services/scheduler.service');
@@ -13,7 +14,13 @@ const authRouter = require('./routes/user.route');
 const articleRouter = require('./routes/article.route');
 const commentRouter = require('./routes/comment.route');
 const likeRouter = require('./routes/like.route');
+const articleLikeRouter = require('./routes/article-like.route');
 const ebookRouter = require('./routes/ebook.route');
+const cartRouter = require('./routes/cart.route');
+const checkoutRouter = require('./routes/checkout.route');
+const shopRouter = require('./routes/shop.route');
+const adminRouter = require('./routes/admin.route');
+const documentRouter = require('./routes/document.route');
 
 const app = express();
 
@@ -22,21 +29,28 @@ app.use(validateContentType);
 app.use(limitRequestSize('10mb'));
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: ['http://localhost:5173', 'http://localhost:5174'], // Support des deux ports
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use(express.json({ limit: '10mb' }));
+app.use(morgan("dev"));
 app.use(cookieParser());
 
 // Routes
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/articles', articleRouter);
+app.use('/api/v1/article-likes', articleLikeRouter);
 app.use('/api/v1/comments', commentRouter);
 app.use('/api/v1/likes', likeRouter);
 app.use('/api/v1/ebooks', ebookRouter);
+app.use('/api/v1/cart', cartRouter);
+app.use('/api/v1/checkout', checkoutRouter);
+app.use('/api/v1/shop', shopRouter);
+app.use('/api/v1/admin', adminRouter);
+app.use('/api/v1/documents', documentRouter);
 
 // Route de test
 app.get('/api/v1/health', (req, res) => {
@@ -52,12 +66,23 @@ app.get('/api/v1/health', (req, res) => {
 
 // Gestion globale des erreurs
 app.use((error, req, res, next) => {
-  console.error('Erreur serveur:', error);
+  // Erreur de parsing JSON
+  if (error.type === 'entity.parse.failed') {
+    return res.status(400).json({
+      status: 'error',
+      message: 'JSON invalide - vérifiez la syntaxe (virgules, guillemets)'
+    });
+  }
+  
+  console.error('Erreur serveur:', error.message);
   res.status(500).json({
     status: 'error',
     message: 'Erreur interne du serveur'
   });
 });
+app.get("/",(req,res)=>{
+  res.send("bienvenue dans app nodejs")
+})
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

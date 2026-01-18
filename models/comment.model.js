@@ -7,9 +7,31 @@ const commentSchema = new mongoose.Schema({
     maxlength: 1000,
     trim: true
   },
+  // Auteur connecté (admin uniquement)
   author: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
+    required: false
+  },
+  // Commentaires anonymes
+  authorName: {
+    type: String,
+    required: function() { return !this.author; },
+    maxlength: 50,
+    trim: true
+  },
+  authorEmail: {
+    type: String,
+    required: function() { return !this.author; },
+    lowercase: true,
+    trim: true
+  },
+  isAnonymous: {
+    type: Boolean,
+    default: true
+  },
+  ipAddress: {
+    type: String,
     required: true
   },
   article: {
@@ -64,6 +86,9 @@ commentSchema.index({ author: 1, status: 1 });
 
 // Middleware pour valider la hiérarchie des commentaires
 commentSchema.pre('save', async function(next) {
+  // Définir si c'est un commentaire anonyme
+  this.isAnonymous = !this.author;
+  
   if (this.parentComment) {
     const parentComment = await this.constructor.findById(this.parentComment);
     

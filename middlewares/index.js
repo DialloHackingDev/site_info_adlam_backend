@@ -1,5 +1,5 @@
 // Authentification
-const { protect, optionalAuth } = require('./auth');
+const { protect, optionalAuth } = require('./auth.middlewares');
 
 // Autorisation
 const { restrictTo, adminOnly, checkOwnership } = require('./authorization');
@@ -15,7 +15,10 @@ const {
   validateModerationAction,
   validateLikeCheck,
   validateEbook,
-  validateEbookUpdate
+  validateEbookUpdate,
+  validateAddToCart,
+  validateUpdateQuantity,
+  validatePaymentConfirmation
 } = require('./validation');
 
 // Sécurité
@@ -33,6 +36,13 @@ const {
   uploadEbookFiles,
   uploadOptionalEbookFiles
 } = require('./upload');
+
+// Sessions anonymes
+const {
+  anonymousSession,
+  sanitizeAnonymousInput,
+  validateAnonymousComment
+} = require('./anonymous');
 
 module.exports = {
   // Authentification
@@ -55,16 +65,24 @@ module.exports = {
   validateLikeCheck,
   validateEbook,
   validateEbookUpdate,
+  validateAddToCart,
+  validateUpdateQuantity,
+  validatePaymentConfirmation,
+  validateAnonymousComment,
   
   // Sécurité
   validateContentType,
   limitRequestSize,
   sanitizeInput,
+  sanitizeAnonymousInput,
   
   // Upload
   uploadCoverImage,
   uploadOptionalImage,
   validateImageDimensions,
   uploadEbookFiles,
-  uploadOptionalEbookFiles
+  uploadOptionalEbookFiles,
+  
+  // Sessions anonymes
+  anonymousSession
 };

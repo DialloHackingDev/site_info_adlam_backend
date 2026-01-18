@@ -2,10 +2,22 @@ require("dotenv").config();
 const mongoose = require("mongoose");
 
 const mongoURI = process.env.MDB_URLS || "mongodb://localhost:27017/dbAdlam";
-//la connexion à la base de donne
-mongoose.connect(mongoURI)
-.then(res => console.log("connexion db reuissi!"))
-.catch(e => console.log("connexion db echoué"));
 
+// Configuration de connexion simplifiée
+const connectDB = async () => {
+  try {
+    const options = {
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000
+    };
+
+    await mongoose.connect(mongoURI, options);
+    console.log("✅ Connexion DB réussie!");
+  } catch (error) {
+    console.error("❌ Connexion DB échouée:", error.message);
+  }
+};
+
+connectDB();
 
 module.exports = mongoose;

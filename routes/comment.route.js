@@ -8,7 +8,10 @@ const {
   validateComment,
   validateCommentUpdate,
   validateModerationAction,
-  sanitizeInput
+  sanitizeInput,
+  anonymousSession,
+  sanitizeAnonymousInput,
+  validateAnonymousComment
 } = require('../middlewares');
 
 const router = express.Router();
@@ -16,27 +19,25 @@ const router = express.Router();
 // Middleware global
 router.use(validateInput);
 router.use(sanitizeInput);
+router.use(anonymousSession);
 
 // Routes publiques avec authentification optionnelle
 router.get('/article/:articleId', optionalAuth, commentController.getArticleComments);
 router.get('/:commentId/replies', optionalAuth, commentController.getCommentReplies);
 
-// Routes protégées (authentification requise)
-router.use(protect);
+// Création de commentaires (public avec auth optionnelle)
+router.post('/', optionalAuth, sanitizeAnonymousInput, validateAnonymousComment, commentController.createComment);
 
-// CRUD des commentaires
-router.post('/', validateComment, commentController.createComment);
-router.patch('/:id', validateCommentUpdate, commentController.updateComment);
-router.delete('/:id', commentController.deleteComment);
+// Likes des commentaires (public avec auth optionnelle)
+router.patch('/:id/like', optionalAuth, commentController.toggleCommentLike);
 
-// Likes des commentaires
-router.patch('/:id/like', commentController.toggleCommentLike);
-
-// Signalement
+// Signalement (public)
 router.post('/:id/report', commentController.reportComment);
 
 // Routes admin uniquement
-router.get('/moderation', adminOnly, commentController.getModerationQueue);
-router.patch('/:id/moderate', adminOnly, validateModerationAction, commentController.moderateComment);
+router.patch('/:id', protect, adminOnly, validateCommentUpdate, commentController.updateComment);
+router.delete('/:id', protect, adminOnly, commentController.deleteComment);
+router.get('/moderation', protect, adminOnly, commentController.getModerationQueue);
+router.patch('/:id/moderate', protect, adminOnly, validateModerationAction, commentController.moderateComment);
 
 module.exports = router;

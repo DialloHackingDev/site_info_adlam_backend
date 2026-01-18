@@ -1,11 +1,13 @@
 const Comment = require('../models/comment.model');
 const Article = require('../models/article.model');
 const Like = require('../models/like.model');
+const AnonymousLike = require('../models/anonymous-like.model');
 
-// Créer un commentaire
+// Créer un commentaire (anonyme ou connecté)
 exports.createComment = async (req, res) => {
   try {
-    const { content, articleId, parentCommentId } = req.body;
+    const { content, articleId, parentCommentId, authorName, authorEmail } = req.body;
+    const ipAddress = req.ip || req.connection.remoteAddress;
 
     // Vérifier que l'article existe
     const article = await Article.findById(articleId);
@@ -26,9 +28,26 @@ exports.createComment = async (req, res) => {
 
     const commentData = {
       content,
-      author: req.user._id,
-      article: articleId
+      article: articleId,
+      ipAddress
     };
+
+    // Si utilisateur connecté (admin)
+    if (req.user) {
+      commentData.author = req.user._id;
+      commentData.isAnonymous = false;
+    } else {
+      // Commentaire anonyme
+      if (!authorName || !authorEmail) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Nom et email requis pour les commentaires anonymes'
+        });
+      }
+      commentData.authorName = authorName;
+      commentData.authorEmail = authorEmail;
+      commentData.isAnonymous = true;
+    }
 
     // Si c'est une réponse à un commentaire
     if (parentCommentId) {
@@ -40,7 +59,6 @@ exports.createComment = async (req, res) => {
         });
       }
 
-      // Vérifier que le parent est sur le même article
       if (parentComment.article.toString() !== articleId) {
         return res.status(400).json({
           status: 'error',
@@ -52,7 +70,11 @@ exports.createComment = async (req, res) => {
     }
 
     const comment = await Comment.create(commentData);
-    await comment.populate('author', 'name email');
+    
+    // Populate selon le type de commentaire
+    if (comment.author) {
+      await comment.populate('author', 'name email');
+    }
 
     res.status(201).json({
       status: 'success',
@@ -192,17 +214,20 @@ exports.updateComment = async (req, res) => {
       });
     }
 
-    // Vérifier les permissions
-    if (comment.author.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+    // Seuls les admins peuvent modifier les commentaires
+    if (!req.user || req.user.role !== 'admin') {
       return res.status(403).json({
         status: 'error',
-        message: 'Non autorisé à modifier ce commentaire'
+        message: 'Seuls les administrateurs peuvent modifier les commentaires'
       });
     }
 
     comment.content = content;
     await comment.markAsEdited();
-    await comment.populate('author', 'name email');
+    
+    if (comment.author) {
+      await comment.populate('author', 'name email');
+    }
 
     res.status(200).json({
       status: 'success',
@@ -229,11 +254,11 @@ exports.deleteComment = async (req, res) => {
       });
     }
 
-    // Vérifier les permissions
-    if (comment.author.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+    // Seuls les admins peuvent supprimer les commentaires
+    if (!req.user || req.user.role !== 'admin') {
       return res.status(403).json({
         status: 'error',
-        message: 'Non autorisé à supprimer ce commentaire'
+        message: 'Seuls les administrateurs peuvent supprimer les commentaires'
       });
     }
 
@@ -242,8 +267,9 @@ exports.deleteComment = async (req, res) => {
       await Comment.deleteMany({ parentComment: id });
     }
 
-    // Supprimer les likes associés
+    // Supprimer les likes associés (anciens et nouveaux systèmes)
     await Like.deleteMany({ targetType: 'Comment', targetId: id });
+    await AnonymousLike.deleteMany({ targetType: 'Comment', targetId: id });
 
     await Comment.findByIdAndDelete(id);
 
@@ -259,13 +285,29 @@ exports.deleteComment = async (req, res) => {
   }
 };
 
-// Liker/Unliker un commentaire
+// Liker/Unliker un commentaire (anonyme ou connecté)
 exports.toggleCommentLike = async (req, res) => {
   try {
     const { id } = req.params;
     const ipAddress = req.ip || req.connection.remoteAddress;
+    const sessionId = req.sessionID || req.headers['x-session-id'] || 'anonymous';
+    const userAgent = req.get('User-Agent');
 
-    const result = await Like.toggleLike(req.user._id, 'Comment', id, ipAddress);
+    let result;
+    
+    if (req.user) {
+      // Utilisateur connecté (admin) - utiliser l'ancien système
+      result = await Like.toggleLike(req.user._id, 'Comment', id, ipAddress);
+    } else {
+      // Visiteur anonyme - utiliser le nouveau système
+      result = await AnonymousLike.toggleLike('Comment', id, ipAddress, sessionId, userAgent);
+      
+      // Mettre à jour le compteur dans le commentaire
+      const likesCount = await AnonymousLike.getLikesCount('Comment', id);
+      await Comment.findByIdAndUpdate(id, { likes: likesCount });
+      
+      result.totalLikes = likesCount;
+    }
 
     res.status(200).json({
       status: 'success',

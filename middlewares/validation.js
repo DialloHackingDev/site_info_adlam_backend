@@ -9,19 +9,22 @@ exports.validateInput = (req, res, next) => {
         message: `Le champ ${fieldName} ne peut pas être un objet`
       });
     }
+    return null; // Pas d'erreur
   };
 
   // Valider le body
   if (req.body) {
     for (const [key, value] of Object.entries(req.body)) {
-      validateValue(value, key);
+      const error = validateValue(value, key);
+      if (error) return; // La réponse a déjà été envoyée
     }
   }
 
   // Valider les query params
   if (req.query) {
     for (const [key, value] of Object.entries(req.query)) {
-      validateValue(value, key);
+      const error = validateValue(value, key);
+      if (error) return; // La réponse a déjà été envoyée
     }
   }
 
@@ -126,6 +129,36 @@ exports.validateArticleUpdate = (req, res, next) => {
     return res.status(400).json({
       status: 'error',
       message: 'Les mots-clés doivent être un tableau'
+    });
+  }
+
+  next();
+};
+
+/**
+ * Validation pour les actions de like/unlike
+ */
+exports.validateLikeAction = (req, res, next) => {
+  const { targetType, targetId } = req.body;
+
+  if (!targetType || !targetId) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Type et ID de la cible requis'
+    });
+  }
+
+  if (!['Article', 'Comment'].includes(targetType)) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Type doit être Article ou Comment'
+    });
+  }
+
+  if (typeof targetId !== 'string') {
+    return res.status(400).json({
+      status: 'error',
+      message: 'ID de la cible invalide'
     });
   }
 
@@ -368,6 +401,18 @@ exports.validateEbookUpdate = (req, res, next) => {
     });
   }
 
+  // Validation du prix
+  if (price !== undefined) {
+    const priceNum = parseFloat(price);
+    if (isNaN(priceNum) || priceNum < 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Le prix doit être un nombre positif'
+      });
+    }
+  }
+
+  // Validation de la catégorie
   if (category) {
     if (typeof category !== 'string') {
       return res.status(400).json({
@@ -381,17 +426,6 @@ exports.validateEbookUpdate = (req, res, next) => {
       return res.status(400).json({
         status: 'error',
         message: 'Catégorie non valide'
-      });
-    }
-  }
-
-  // Validation du prix
-  if (price !== undefined) {
-    const priceNum = parseFloat(price);
-    if (isNaN(priceNum) || priceNum < 0) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Le prix doit être un nombre positif'
       });
     }
   }
@@ -415,6 +449,79 @@ exports.validateEbookUpdate = (req, res, next) => {
     return res.status(400).json({
       status: 'error',
       message: 'Le nom de l\'auteur ne peut pas dépasser 100 caractères'
+    });
+  }
+
+  next();
+};
+
+/**
+ * Validation pour l'ajout au panier
+ */
+exports.validateAddToCart = (req, res, next) => {
+  const { ebookId, quantity } = req.body;
+
+  if (!ebookId || typeof ebookId !== 'string') {
+    return res.status(400).json({
+      status: 'error',
+      message: 'ID de l\'e-book requis'
+    });
+  }
+
+  if (quantity !== undefined) {
+    const qty = parseInt(quantity);
+    if (isNaN(qty) || qty < 1 || qty > 10) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Quantité doit être entre 1 et 10'
+      });
+    }
+  }
+
+  next();
+};
+
+/**
+ * Validation pour la mise à jour de quantité
+ */
+exports.validateUpdateQuantity = (req, res, next) => {
+  const { quantity } = req.body;
+
+  if (quantity === undefined) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Quantité requise'
+    });
+  }
+
+  const qty = parseInt(quantity);
+  if (isNaN(qty) || qty < 0 || qty > 10) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Quantité doit être entre 0 et 10'
+    });
+  }
+
+  next();
+};
+
+/**
+ * Validation pour la confirmation de paiement
+ */
+exports.validatePaymentConfirmation = (req, res, next) => {
+  const { paymentIntentId } = req.body;
+
+  if (!paymentIntentId || typeof paymentIntentId !== 'string') {
+    return res.status(400).json({
+      status: 'error',
+      message: 'PaymentIntent ID requis'
+    });
+  }
+
+  if (!paymentIntentId.startsWith('pi_')) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Format PaymentIntent ID invalide'
     });
   }
 

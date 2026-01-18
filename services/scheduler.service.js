@@ -43,6 +43,12 @@ class SchedulerService {
    */
   async publishScheduledArticles() {
     try {
+      // Vérifier si la base de données est connectée
+      if (require('mongoose').connection.readyState !== 1) {
+        console.log('⚠️ Base de données non connectée, skip scheduler');
+        return;
+      }
+
       const now = new Date();
       
       const articlesToPublish = await Article.find({
@@ -64,7 +70,12 @@ class SchedulerService {
         }
       }
     } catch (error) {
-      console.error('❌ Erreur lors de la publication des articles planifiés:', error);
+      // Ne pas afficher l'erreur complète si c'est un problème de connexion
+      if (error.name === 'MongoServerSelectionError') {
+        console.log('⚠️ Connexion MongoDB temporairement indisponible');
+      } else {
+        console.error('❌ Erreur lors de la publication des articles planifiés:', error.message);
+      }
     }
   }
 

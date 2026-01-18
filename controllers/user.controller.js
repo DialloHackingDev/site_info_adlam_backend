@@ -11,7 +11,7 @@ const signToken = (id) => {
 
 exports.register = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, role } = req.body;
     
     // Validation des types pour prévenir l'injection NoSQL
     if (!name || !email || !password || 
@@ -24,10 +24,13 @@ exports.register = async (req, res) => {
       });
     }
     
-    // Hash du mot de passe avec await
-    const salt = 10;
-    const hash = await bcrypt.hash(password, salt);
-    const newUser = await User.create({ name, email, password: hash });
+    // Créer l'utilisateur avec le rôle spécifié (admin si fourni)
+    const userData = { name, email, password };
+    if (role && (role === 'admin' || role === 'user')) {
+      userData.role = role;
+    }
+    
+    const newUser = await User.create(userData);
 
     const token = signToken(newUser._id);
 
@@ -51,11 +54,11 @@ exports.register = async (req, res) => {
         message: "Cet email est déjà utilisé"
       });
     }
+    console.log(error)
     res.status(400).json({
       status: 'error',
       message: error.message || 'Erreur lors de la création du compte'
     });
-    // Logging supprimé - utiliser un logger approprié en production
   }
 };
 
@@ -74,12 +77,20 @@ exports.login = async (req, res) => {
     }
 
     const user = await User.findOne({ email }).select('+password');
-    const verifyPassword = await user.comparePassword(password);
-    if (!user || !verifyPassword) {
+    if (!user) {
       return res.status(401).json({
         status: 'error',
         message: 'Email ou mot de passe incorrect'
       });
+    }
+    
+    const verifyPassword = await user.comparePassword(password);
+    if (!verifyPassword) {
+      return res.status(401).json({
+        status: 'error',
+        message: 'Email ou mot de passe incorrect'
+      });
+      
     }
 
     const token = signToken(user._id);
@@ -110,5 +121,33 @@ exports.login = async (req, res) => {
       status: 'error',
       message: 'Erreur serveur lors de la connexion'
     });
+    console.log(error)
+  }
+};
+
+// Obtenir l'utilisateur actuel (profil)
+exports.getMe = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Utilisateur non trouvé'
+      });
+    }
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        user: user.getPublicData()
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Erreur serveur lors de la récupération du profil'
+    });
+    console.log(error)
   }
 };
