@@ -97,61 +97,60 @@ const articleSchema = new mongoose.Schema({
 articleSchema.index({ title: 'text', content: 'text', tags: 'text' });
 articleSchema.index({ status: 1, publishedAt: -1 });
 articleSchema.index({ category: 1, status: 1 });
-articleSchema.index({ slug: 1 });
 
-// Middleware pour générer le slug automatiquement
-articleSchema.pre('save', async function(next) {
-  try {
-    // Calculer le temps de lecture (250 mots par minute)
-    if (this.isModified('content')) {
-      const wordCount = this.content.split(/\s+/).length;
-      this.readingTime = Math.ceil(wordCount / 250);
-    }
-    
-    // Générer l'extrait automatiquement si pas fourni
-    if (this.isModified('content') && !this.excerpt) {
-      this.excerpt = this.content.replace(/<[^>]*>/g, '').substring(0, 300) + '...';
-    }
-    
-    // Définir publishedAt si le statut passe à published
-    if (this.isModified('status') && this.status === 'published' && !this.publishedAt) {
-      this.publishedAt = new Date();
-    }
-    
-    // Nettoyer scheduledAt si le statut n'est plus scheduled
-    if (this.isModified('status') && this.status !== 'scheduled') {
-      this.scheduledAt = null;
-    }
-    
-    next();
-  } catch (error) {
-    next(error);
-  }
-});
+// Middleware pour générer le slug automatiquement (désactivé temporairement)
+// articleSchema.pre('save', async function (next) {
+//   try {
+//     // Calculer le temps de lecture (250 mots par minute)
+//     if (this.isModified('content')) {
+//       const wordCount = this.content.split(/\s+/).length;
+//       this.readingTime = Math.ceil(wordCount / 250);
+//     }
+//
+//     // Générer l'extrait automatiquement si pas fourni
+//     if (this.isModified('content') && !this.excerpt) {
+//       this.excerpt = this.content.replace(/<[^>]*>/g, '').substring(0, 300) + '...';
+//     }
+//
+//     // Définir publishedAt si le statut passe à published
+//     if (this.isModified('status') && this.status === 'published' && !this.publishedAt) {
+//       this.publishedAt = new Date();
+//     }
+//
+//     // Nettoyer scheduledAt si le statut n'est plus scheduled
+//     if (this.isModified('status') && this.status !== 'scheduled') {
+//       this.scheduledAt = null;
+//     }
+//
+//     next();
+//   } catch (error) {
+//     next(error);
+//   }
+// });
 
 // Méthodes d'instance
-articleSchema.methods.incrementViews = function() {
+articleSchema.methods.incrementViews = function () {
   this.views += 1;
   this.lastViewedAt = new Date();
   return this.save();
 };
 
-articleSchema.methods.toggleLike = function(increment = true) {
+articleSchema.methods.toggleLike = function (increment = true) {
   this.likes += increment ? 1 : -1;
   if (this.likes < 0) this.likes = 0;
   return this.save();
 };
 
-articleSchema.methods.toggleFeatured = function() {
+articleSchema.methods.toggleFeatured = function () {
   this.featured = !this.featured;
   return this.save();
 };
 
-articleSchema.methods.canBePublished = function() {
+articleSchema.methods.canBePublished = function () {
   return this.title && this.content && this.category;
 };
 
-articleSchema.methods.getPublicData = function() {
+articleSchema.methods.getPublicData = function () {
   const article = this.toObject();
   // Supprimer les données sensibles pour l'API publique
   delete article.coverImagePublicId;
@@ -159,9 +158,9 @@ articleSchema.methods.getPublicData = function() {
 };
 
 // Méthodes statiques
-articleSchema.statics.getPublished = function(options = {}) {
+articleSchema.statics.getPublished = function (options = {}) {
   const { category, limit = 10, skip = 0, sort = { publishedAt: -1 }, featured = null } = options;
-  
+
   const query = { status: 'published' };
   if (category && category !== 'all') {
     query.category = category;
@@ -169,7 +168,7 @@ articleSchema.statics.getPublished = function(options = {}) {
   if (featured !== null) {
     query.featured = featured;
   }
-  
+
   return this.find(query)
     .populate('author', 'name email')
     .sort(sort)
@@ -177,7 +176,7 @@ articleSchema.statics.getPublished = function(options = {}) {
     .skip(skip);
 };
 
-articleSchema.statics.getRecent = function(limit = 5) {
+articleSchema.statics.getRecent = function (limit = 5) {
   return this.find({ status: 'published' })
     .populate('author', 'name email')
     .sort({ publishedAt: -1 })
@@ -185,18 +184,18 @@ articleSchema.statics.getRecent = function(limit = 5) {
     .select('title slug excerpt coverImage category publishedAt views likes readingTime featured');
 };
 
-articleSchema.statics.getFeatured = function(limit = 3) {
+articleSchema.statics.getFeatured = function (limit = 3) {
   return this.find({ status: 'published', featured: true })
     .populate('author', 'name email')
     .sort({ publishedAt: -1 })
     .limit(limit);
 };
 
-articleSchema.statics.getPopular = function(limit = 5, days = 7) {
+articleSchema.statics.getPopular = function (limit = 5, days = 7) {
   const dateLimit = new Date();
   dateLimit.setDate(dateLimit.getDate() - days);
-  
-  return this.find({ 
+
+  return this.find({
     status: 'published',
     publishedAt: { $gte: dateLimit }
   })
@@ -205,12 +204,12 @@ articleSchema.statics.getPopular = function(limit = 5, days = 7) {
     .limit(limit);
 };
 
-articleSchema.statics.getByCategory = function(category, options = {}) {
+articleSchema.statics.getByCategory = function (category, options = {}) {
   const { limit = 10, skip = 0 } = options;
-  
-  return this.find({ 
+
+  return this.find({
     status: 'published',
-    category 
+    category
   })
     .populate('author', 'name email')
     .sort({ publishedAt: -1 })
@@ -218,18 +217,18 @@ articleSchema.statics.getByCategory = function(category, options = {}) {
     .skip(skip);
 };
 
-articleSchema.statics.searchArticles = function(searchTerm, options = {}) {
+articleSchema.statics.searchArticles = function (searchTerm, options = {}) {
   const { category, limit = 10, skip = 0 } = options;
-  
+
   const query = {
     status: 'published',
     $text: { $search: searchTerm }
   };
-  
+
   if (category && category !== 'all') {
     query.category = category;
   }
-  
+
   return this.find(query, { score: { $meta: 'textScore' } })
     .populate('author', 'name email')
     .sort({ score: { $meta: 'textScore' } })
@@ -237,7 +236,7 @@ articleSchema.statics.searchArticles = function(searchTerm, options = {}) {
     .skip(skip);
 };
 
-articleSchema.statics.getScheduledStats = function() {
+articleSchema.statics.getScheduledStats = function () {
   return this.aggregate([
     { $match: { status: 'scheduled' } },
     {
@@ -250,7 +249,7 @@ articleSchema.statics.getScheduledStats = function() {
   ]);
 };
 
-articleSchema.statics.getCategoryStats = function() {
+articleSchema.statics.getCategoryStats = function () {
   return this.aggregate([
     { $match: { status: 'published' } },
     {

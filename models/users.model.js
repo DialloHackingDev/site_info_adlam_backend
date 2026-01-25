@@ -29,9 +29,9 @@ const userSchema = new mongoose.Schema({
   }
 });
 
-// Middleware pour hacher le mot de passe avant sauvegarde
+// Middleware pour hacher le mot de passe avant de sauvegarder
 userSchema.pre('save', async function(next) {
-  // Ne hacher que si le mot de passe est modifié
+  // Ne hacher que si le mot de passe a été modifié
   if (!this.isModified('password')) return next();
   
   try {

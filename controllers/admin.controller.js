@@ -1,7 +1,7 @@
 const Article = require('../models/article.model');
 const Ebook = require('../models/ebook.model');
 const User = require('../models/users.model');
-const cloudinary = require('../config/cloudinary');
+const { cloudinary } = require('../config/cloudinary');
 
 // Statistiques du dashboard
 exports.getDashboardStats = async (req, res) => {
@@ -43,47 +43,78 @@ exports.createArticle = async (req, res) => {
   try {
     console.log('Creating article with data:', req.body);
     console.log('File received:', req.file ? 'Yes' : 'No');
-    
+
     const articleData = { ...req.body, author: req.user._id };
-    
+
+    // Upload de l'image de couverture si fournie
+    if (req.file) {
+      try {
+        console.log('Saving image locally:', req.file.originalname);
+        
+        const fs = require('fs');
+        const path = require('path');
+        const uploadDir = path.join(__dirname, '../uploads');
+        
+        // Créer le dossier uploads s'il n'existe pas
+        if (!fs.existsSync(uploadDir)) {
+          fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        
+        const filename = `article-${Date.now()}-${req.file.originalname}`;
+        const filepath = path.join(uploadDir, filename);
+        
+        fs.writeFileSync(filepath, req.file.buffer);
+        
+        articleData.coverImage = `http://localhost:5000/uploads/${filename}`;
+        articleData.coverImagePublicId = filename;
+        console.log('Image saved successfully:', articleData.coverImage);
+      } catch (uploadError) {
+        console.error('File save error:', uploadError);
+        return res.status(400).json({
+          status: 'error',
+          message: 'Erreur lors de l\'upload de l\'image: ' + uploadError.message
+        });
+      }
+    }
+
     // Générer un slug simple sans dépendance circulaire
     const timestamp = Date.now();
     const randomNum = Math.floor(Math.random() * 1000);
     articleData.slug = `article-${timestamp}-${randomNum}`;
     console.log('Generated slug:', articleData.slug);
-    
+
     // Convertir les booléens string en booléens
     if (articleData.featured === 'true') articleData.featured = true;
     if (articleData.featured === 'false') articleData.featured = false;
     if (articleData.published === 'true') articleData.status = 'published';
     if (articleData.published === 'false') articleData.status = 'draft';
-    
+
     // Mapper les catégories frontend vers backend
     const categoryMap = {
       'literature': 'litterature',
       'history': 'histoire',
       'education': 'education',
-      'culture': 'culture', 
+      'culture': 'culture',
       'science': 'science',
       'religion': 'religion'
     };
-    
+
     if (articleData.category && categoryMap[articleData.category]) {
       articleData.category = categoryMap[articleData.category];
     }
-    
+
     // Traiter les tags
     if (articleData.tags && typeof articleData.tags === 'string') {
       articleData.tags = articleData.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
     }
-    
+
     // Supprimer le champ published car on utilise status
     delete articleData.published;
-    
+
     console.log('Final article data:', articleData);
-    
+
     const article = await Article.create(articleData);
-    
+
     res.status(201).json({
       status: 'success',
       data: { article }
@@ -101,20 +132,26 @@ exports.createArticle = async (req, res) => {
 exports.updateArticle = async (req, res) => {
   try {
     const updateData = { ...req.body };
-    
+
     // Upload nouvelle image si fournie
     if (req.file) {
       const article = await Article.findById(req.params.id);
-      
+
       // Supprimer l'ancienne image
       if (article.coverImagePublicId) {
         await cloudinary.uploader.destroy(article.coverImagePublicId);
       }
-      
-      const result = await cloudinary.uploader.upload(req.file.path, {
-        folder: 'adlam/articles',
-        resource_type: 'image'
+
+      const result = await new Promise((resolve, reject) => {
+        cloudinary.uploader.upload_stream({
+          folder: 'adlam/articles',
+          resource_type: 'image'
+        }, (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }).end(req.file.buffer);
       });
+      
       updateData.coverImage = result.secure_url;
       updateData.coverImagePublicId = result.public_id;
     }
@@ -148,7 +185,7 @@ exports.updateArticle = async (req, res) => {
 exports.deleteArticle = async (req, res) => {
   try {
     const article = await Article.findById(req.params.id);
-    
+
     if (!article) {
       return res.status(404).json({
         status: 'error',
@@ -185,19 +222,19 @@ exports.createEbook = async (req, res) => {
     
     // Ajouter les champs requis
     ebookData.createdBy = req.user._id;
-    ebookData.slug = `ebook-${Date.now()}`; // Slug temporaire
-    ebookData.coverImage = 'https://via.placeholder.com/400x600'; // Image par défaut
+    ebookData.slug = `ebook-${Date.now()}`;
+    ebookData.coverImage = 'https://via.placeholder.com/400x600';
     ebookData.coverImagePublicId = 'placeholder';
-    ebookData.pdfFile = 'https://via.placeholder.com/file.pdf'; // PDF par défaut
+    ebookData.pdfFile = 'https://via.placeholder.com/file.pdf';
     ebookData.pdfFilePublicId = 'placeholder';
     
-    // Convertir les booléens string en booléens
+    // Convertir les booléens
     if (ebookData.featured === 'true') ebookData.featured = true;
     if (ebookData.featured === 'false') ebookData.featured = false;
-    if (ebookData.published === 'true') ebookData.published = true;
-    if (ebookData.published === 'false') ebookData.published = false;
+    if (ebookData.published === 'true') ebookData.status = 'published';
+    if (ebookData.published === 'false') ebookData.status = 'draft';
     
-    // Mapper les catégories frontend vers backend
+    // Mapper les catégories
     const categoryMap = {
       'literature': 'litterature',
       'history': 'histoire',
@@ -212,21 +249,85 @@ exports.createEbook = async (req, res) => {
     }
     
     // Corriger la langue
-    if (ebookData.language === 'fulani') {
-      ebookData.language = 'fr'; // Utiliser 'fr' temporairement
+    if (ebookData.language === 'fulani' || ebookData.language === 'pular') {
+      ebookData.language = 'french'; // Temporairement, utiliser 'french' au lieu de 'pular'
+    } else if (!ebookData.language) {
+      ebookData.language = 'french'; // Valeur par défaut
     }
     
-    // Convertir le prix en nombre
+    // Convertir les nombres
     if (ebookData.price) {
-      ebookData.price = parseFloat(ebookData.price);
+      ebookData.price = parseFloat(ebookData.price) || 0;
     }
     
-    // Convertir le nombre de pages en nombre
     if (ebookData.pages) {
-      ebookData.pages = parseInt(ebookData.pages);
+      ebookData.pageCount = parseInt(ebookData.pages) || 0;
     }
     
-    console.log('Final ebook data:', ebookData);
+    // Traiter les fichiers uploadés
+    console.log('Checking for files...', req.files ? 'Files found' : 'No files');
+    if (req.files) {
+      try {
+        console.log('Processing files...');
+        
+        // Upload image de couverture localement
+        if (req.files.coverImage && req.files.coverImage[0]) {
+          const coverFile = req.files.coverImage[0];
+          const fs = require('fs');
+          const path = require('path');
+          const uploadDir = path.join(__dirname, '../uploads');
+          
+          if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+          }
+          
+          const filename = `cover-${Date.now()}-${coverFile.originalname}`;
+          const filepath = path.join(uploadDir, filename);
+          
+          fs.writeFileSync(filepath, coverFile.buffer);
+          
+          ebookData.coverImage = `/uploads/${filename}`;
+          ebookData.coverImagePublicId = filename;
+          console.log('Cover image saved:', ebookData.coverImage);
+        }
+        
+        // Upload fichier PDF localement
+        if (req.files.pdfFile && req.files.pdfFile[0]) {
+          const pdfFile = req.files.pdfFile[0];
+          const fs = require('fs');
+          const path = require('path');
+          const uploadDir = path.join(__dirname, '../uploads');
+          
+          if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+          }
+          
+          const filename = `pdf-${Date.now()}-${pdfFile.originalname}`;
+          const filepath = path.join(uploadDir, filename);
+          
+          fs.writeFileSync(filepath, pdfFile.buffer);
+          
+          ebookData.pdfFile = `/uploads/${filename}`;
+          ebookData.pdfFilePublicId = filename;
+          ebookData.fileSize = pdfFile.size;
+          console.log('PDF file saved:', ebookData.pdfFile);
+        }
+        
+        console.log('Files processed successfully');
+      } catch (fileError) {
+        console.error('Error processing files:', fileError);
+        return res.status(400).json({
+          status: 'error',
+          message: 'Erreur lors du traitement des fichiers: ' + fileError.message
+        });
+      }
+    }
+    
+    // Supprimer les champs non nécessaires
+    delete ebookData.published;
+    delete ebookData.pages;
+    
+    console.log('Final ebook data before creation:', ebookData);
     
     const ebook = await Ebook.create(ebookData);
     
@@ -235,7 +336,7 @@ exports.createEbook = async (req, res) => {
       data: { ebook }
     });
   } catch (error) {
-    console.error('Create ebook error:', error);
+    console.error('Create ebook error details:', error);
     res.status(400).json({
       status: 'error',
       message: error.message || 'Erreur lors de la création de l\'e-book'
@@ -248,7 +349,7 @@ exports.updateEbook = async (req, res) => {
   try {
     const updateData = { ...req.body };
     const ebook = await Ebook.findById(req.params.id);
-    
+
     if (!ebook) {
       return res.status(404).json({
         status: 'error',
@@ -261,7 +362,7 @@ exports.updateEbook = async (req, res) => {
       if (ebook.coverImagePublicId) {
         await cloudinary.uploader.destroy(ebook.coverImagePublicId);
       }
-      
+
       const coverResult = await cloudinary.uploader.upload(req.files.coverImage[0].path, {
         folder: 'adlam/ebooks/covers',
         resource_type: 'image'
@@ -275,7 +376,7 @@ exports.updateEbook = async (req, res) => {
       if (ebook.filePublicId) {
         await cloudinary.uploader.destroy(ebook.filePublicId);
       }
-      
+
       const pdfResult = await cloudinary.uploader.upload(req.files.pdfFile[0].path, {
         folder: 'adlam/ebooks/files',
         resource_type: 'raw'
@@ -306,7 +407,7 @@ exports.updateEbook = async (req, res) => {
 exports.deleteEbook = async (req, res) => {
   try {
     const ebook = await Ebook.findById(req.params.id);
-    
+
     if (!ebook) {
       return res.status(404).json({
         status: 'error',

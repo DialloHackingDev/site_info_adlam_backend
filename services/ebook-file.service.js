@@ -27,6 +27,13 @@ class EbookFileService {
    */
   static async uploadCover(buffer, filename) {
     try {
+      // Vérifier si Cloudinary est configuré
+      if (!process.env.CLOUDINARY_CLOUDNAME || 
+          !process.env.CLOUDINARY_API_KEY || 
+          !process.env.CLOUDINARY_API_SECRET) {
+        throw new Error('Cloudinary n\'est pas configuré');
+      }
+
       const result = await this.uploadFromBuffer(buffer, {
         folder: 'adlam/ebooks/covers',
         public_id: `cover_${Date.now()}_${filename.replace(/\.[^/.]+$/, '')}`,
@@ -120,8 +127,8 @@ class EbookFileService {
 
     try {
       // Traiter la couverture
-      if (files.cover && files.cover[0]) {
-        const coverFile = files.cover[0];
+      if (files.coverImage && files.coverImage[0]) {
+        const coverFile = files.coverImage[0];
         results.cover = await this.uploadCover(
           coverFile.buffer, 
           coverFile.originalname
@@ -174,8 +181,8 @@ class EbookFileService {
 
     try {
       // Mettre à jour la couverture si fournie
-      if (files.cover && files.cover[0]) {
-        const coverFile = files.cover[0];
+      if (files.coverImage && files.coverImage[0]) {
+        const coverFile = files.coverImage[0];
         results.cover = await this.uploadCover(
           coverFile.buffer, 
           coverFile.originalname
@@ -227,8 +234,8 @@ class EbookFileService {
     const errors = [];
 
     // Vérifier la couverture
-    if (files.cover && files.cover[0]) {
-      const cover = files.cover[0];
+    if (files.coverImage && files.coverImage[0]) {
+      const cover = files.coverImage[0];
       if (!cover.mimetype.startsWith('image/')) {
         errors.push('La couverture doit être une image');
       }
@@ -243,7 +250,7 @@ class EbookFileService {
       if (pdf.mimetype !== 'application/pdf') {
         errors.push('Le fichier doit être un PDF');
       }
-      if (pdf.size > 10 * 1024 * 1024) { // 10MB au lieu de 50MB
+      if (pdf.size > 10 * 1024 * 1024) { // 10MB
         errors.push('Le PDF ne peut pas dépasser 10MB');
       }
     }

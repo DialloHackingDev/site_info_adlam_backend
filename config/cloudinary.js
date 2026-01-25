@@ -2,20 +2,18 @@ const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const multer = require('multer');
 
-// Vérifier la configuration Cloudinary
-if (!process.env.CLOUDINARY_CLOUD_NAME || 
-    !process.env.CLOUDINARY_API_KEY || 
-    !process.env.CLOUDINARY_API_SECRET ||
-    process.env.CLOUDINARY_CLOUD_NAME === 'your_cloud_name') {
-  console.warn('⚠️  Cloudinary non configuré - upload de fichiers désactivé');
-} else {
-  // Configuration Cloudinary
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET
-  });
-}
+// Configuration Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUDNAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+console.log('Cloudinary configuré:', {
+  cloud_name: process.env.CLOUDINARY_CLOUDNAME,
+  api_key: process.env.CLOUDINARY_API_KEY ? 'Défini' : 'Non défini',
+  api_secret: process.env.CLOUDINARY_API_SECRET ? 'Défini' : 'Non défini'
+});
 
 // Configuration du stockage Cloudinary pour les images d'articles
 const articleImageStorage = new CloudinaryStorage({
@@ -106,7 +104,7 @@ const uploadEbookFiles = multer({
     files: 2
   },
   fileFilter: (req, file, cb) => {
-    if (file.fieldname === 'cover' && file.mimetype.startsWith('image/')) {
+    if (file.fieldname === 'coverImage' && file.mimetype.startsWith('image/')) {
       cb(null, true);
     } else if (file.fieldname === 'pdfFile' && file.mimetype === 'application/pdf') {
       cb(null, true);

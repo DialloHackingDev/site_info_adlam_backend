@@ -8,7 +8,7 @@ const EbookFileService = require('../services/ebook-file.service');
  */
 exports.uploadEbookFiles = (req, res, next) => {
   const upload = uploadEbookFiles.fields([
-    { name: 'cover', maxCount: 1 },
+    { name: 'coverImage', maxCount: 1 },
     { name: 'pdfFile', maxCount: 1 }
   ]);
   
@@ -47,7 +47,7 @@ exports.uploadEbookFiles = (req, res, next) => {
  */
 exports.uploadOptionalEbookFiles = (req, res, next) => {
   const upload = uploadEbookFiles.fields([
-    { name: 'cover', maxCount: 1 },
+    { name: 'coverImage', maxCount: 1 },
     { name: 'pdfFile', maxCount: 1 }
   ]);
   

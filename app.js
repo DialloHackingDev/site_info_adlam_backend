@@ -29,15 +29,20 @@ app.use(validateContentType);
 app.use(limitRequestSize('10mb'));
 
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5174'], // Support des deux ports
+  origin: ['http://localhost:5173', 'http://localhost:5174','http://localhost:5175','http://localhost:5176'], // Support des deux ports
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-app.use(express.json({ limit: '10mb' }));
+// Configuration UTF-8 pour supporter les caractères Adlam
+app.use(express.json({ limit: '10mb', charset: 'utf-8' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb', charset: 'utf-8' }));
 app.use(morgan("dev"));
 app.use(cookieParser());
+
+// Servir les fichiers statiques du dossier uploads
+app.use('/uploads', express.static('uploads'));
 
 // Routes
 app.use('/api/v1/auth', authRouter);
@@ -73,21 +78,21 @@ app.use((error, req, res, next) => {
       message: 'JSON invalide - vérifiez la syntaxe (virgules, guillemets)'
     });
   }
-  
+
   console.error('Erreur serveur:', error.message);
   res.status(500).json({
     status: 'error',
     message: 'Erreur interne du serveur'
   });
 });
-app.get("/",(req,res)=>{
+app.get("/", (req, res) => {
   res.send("bienvenue dans app nodejs")
 })
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
-  
+
   // Démarrer le scheduler des articles planifiés
   schedulerService.start();
 });
