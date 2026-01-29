@@ -30,17 +30,12 @@ const userSchema = new mongoose.Schema({
 });
 
 // Middleware pour hacher le mot de passe avant de sauvegarder
-userSchema.pre('save', async function(next) {
+userSchema.pre('save', async function() {
   // Ne hacher que si le mot de passe a été modifié
-  if (!this.isModified('password')) return next();
+  if (!this.isModified('password')) return;
   
-  try {
-    // Hacher le mot de passe avec un coût de 12
-    this.password = await bcrypt.hash(this.password, 12);
-    next();
-  } catch (error) {
-    next(error);
-  }
+  // Hacher le mot de passe avec un coût de 12
+  this.password = await bcrypt.hash(this.password, 12);
 });
 
 // Méthode pour comparer le mot de passe
