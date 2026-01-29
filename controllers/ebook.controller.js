@@ -184,6 +184,41 @@ exports.getAllEbooks = async (req, res) => {
   }
 };
 
+// Obtenir un e-book par ID
+exports.getEbookById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const ebook = await Ebook.findById(id);
+
+    if (!ebook) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'E-book non trouvé'
+      });
+    }
+
+    // Vérifier les permissions pour les e-books non publiés
+    if (ebook.status !== 'published' && 
+        (!req.user || (req.user._id.toString() !== ebook.createdBy.toString() && req.user.role !== 'admin'))) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Accès non autorisé'
+      });
+    }
+
+    res.status(200).json({
+      status: 'success',
+      data: { ebook: ebook.getPublicData ? ebook.getPublicData() : ebook }
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+};
+
 // Obtenir un e-book par slug
 exports.getEbookBySlug = async (req, res) => {
   try {

@@ -27,6 +27,7 @@ router.get('/category/:category', ebookController.getEbooksByCategory);
 // Routes avec authentification optionnelle
 router.get('/', optionalAuth, ebookController.getAllEbooks);
 router.get('/slug/:slug', optionalAuth, ebookController.getEbookBySlug);
+router.get('/:id', optionalAuth, ebookController.getEbookById);
 
 // Routes protégées (authentification requise)
 router.use(protect);
