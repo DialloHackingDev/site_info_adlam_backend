@@ -21,7 +21,7 @@ exports.createEbook = async (req, res) => {
     } = req.body;
 
     // Vérifier que les fichiers requis sont présents
-    if (!req.files || !req.files.cover || !req.files.pdfFile) {
+    if (!req.files || !req.files.coverImage || !req.files.pdfFile) {
       return res.status(400).json({
         status: 'error',
         message: 'Couverture et fichier PDF sont obligatoires'
@@ -38,12 +38,12 @@ exports.createEbook = async (req, res) => {
       price: parseFloat(price) || 0,
       currency: currency || 'GNF',
       category,
-      tags: Array.isArray(tags) ? tags : (tags ? tags.split(',').map(t => t.trim()) : []),
+      tags: Array.isArray(tags) ? tags.filter(tag => tag && tag.trim() !== '') : (tags ? tags.split(',').map(t => t.trim()).filter(t => t) : []),
       previewPages: parseInt(previewPages) || 10,
       language: language || 'pular',
       metaTitle,
       metaDescription,
-      keywords: Array.isArray(keywords) ? keywords : (keywords ? keywords.split(',').map(k => k.trim()) : []),
+      keywords: Array.isArray(keywords) ? keywords.filter(keyword => keyword && keyword.trim() !== '') : (keywords ? keywords.split(',').map(k => k.trim()).filter(k => k) : []),
       status: status || 'draft',
       createdBy: req.user._id,
       // Fichiers
@@ -262,9 +262,11 @@ exports.getEbookBySlug = async (req, res) => {
 // Obtenir les e-books récents
 exports.getRecentEbooks = async (req, res) => {
   try {
+    console.log('🔍 getRecentEbooks appelé avec limit:', req.query.limit);
     const { limit = 8 } = req.query;
 
     const ebooks = await Ebook.getRecent(parseInt(limit));
+    console.log('📚 E-books récents trouvés:', ebooks.length);
 
     res.status(200).json({
       status: 'success',
@@ -272,6 +274,7 @@ exports.getRecentEbooks = async (req, res) => {
       data: { ebooks: ebooks.map(ebook => ebook.getPublicData()) }
     });
   } catch (error) {
+    console.error('❌ Erreur getRecentEbooks:', error);
     res.status(500).json({
       status: 'error',
       message: error.message
@@ -378,7 +381,7 @@ exports.updateEbook = async (req, res) => {
     }
 
     // Traiter les nouveaux fichiers si fournis
-    if (req.files && (req.files.cover || req.files.pdfFile)) {
+    if (req.files && (req.files.coverImage || req.files.pdfFile)) {
       const fileResults = await EbookFileService.updateEbookFiles(req.files, ebook);
       
       if (fileResults.cover) {
@@ -395,12 +398,34 @@ exports.updateEbook = async (req, res) => {
       }
     }
 
-    // Traiter les tags et keywords
-    if (updates.tags && typeof updates.tags === 'string') {
-      updates.tags = updates.tags.split(',').map(t => t.trim());
+    // Normaliser les tableaux (tags et keywords)
+    if (updates.tags) {
+      if (typeof updates.tags === 'string') {
+        try {
+          updates.tags = JSON.parse(updates.tags);
+        } catch (e) {
+          updates.tags = updates.tags.split(',').map(t => t.trim());
+        }
+      }
+      updates.tags = Array.isArray(updates.tags) ? updates.tags.filter(tag => tag && tag.trim() !== '') : [];
     }
-    if (updates.keywords && typeof updates.keywords === 'string') {
-      updates.keywords = updates.keywords.split(',').map(k => k.trim());
+    if (updates.keywords) {
+      if (typeof updates.keywords === 'string') {
+        try {
+          updates.keywords = JSON.parse(updates.keywords);
+        } catch (e) {
+          updates.keywords = updates.keywords.split(',').map(k => k.trim());
+        }
+      }
+      updates.keywords = Array.isArray(updates.keywords) ? updates.keywords.filter(keyword => keyword && keyword.trim() !== '') : [];
+    }
+
+    // Convertir price en nombre si c'est une chaîne
+    if (updates.price && typeof updates.price === 'string') {
+      updates.price = parseFloat(updates.price);
+    }
+    if (updates.previewPages && typeof updates.previewPages === 'string') {
+      updates.previewPages = parseInt(updates.previewPages);
     }
 
     const updatedEbook = await Ebook.findByIdAndUpdate(

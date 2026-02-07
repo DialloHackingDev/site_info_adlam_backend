@@ -21,6 +21,7 @@ const checkoutRouter = require('./routes/checkout.route');
 const shopRouter = require('./routes/shop.route');
 const adminRouter = require('./routes/admin.route');
 const documentRouter = require('./routes/document.route');
+const contactRouter = require('./routes/contact.route');
 
 const app = express();
 
@@ -56,6 +57,7 @@ app.use('/api/v1/checkout', checkoutRouter);
 app.use('/api/v1/shop', shopRouter);
 app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/documents', documentRouter);
+app.use('/api/v1/contact', contactRouter);
 
 // Route de test
 app.get('/api/v1/health', (req, res) => {

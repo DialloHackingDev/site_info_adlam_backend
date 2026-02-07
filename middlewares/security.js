@@ -60,7 +60,18 @@ exports.sanitizeInput = (req, res, next) => {
   };
 
   if (req.body) {
-    req.body = sanitizeObject(req.body);
+    // Normaliser les tableaux envoyés via FormData
+    // FormData envoie les tableaux comme des valeurs multiples avec la même clé
+    const normalizedBody = {};
+    for (const [key, value] of Object.entries(req.body)) {
+      // Si c'est un tableau avec un seul élément vide, le transformer en tableau vide
+      if (Array.isArray(value) && value.length === 1 && value[0] === '') {
+        normalizedBody[key] = [];
+      } else {
+        normalizedBody[key] = value;
+      }
+    }
+    req.body = sanitizeObject(normalizedBody);
   }
 
   if (req.query) {

@@ -104,8 +104,21 @@ exports.createArticle = async (req, res) => {
     }
 
     // Traiter les tags
-    if (articleData.tags && typeof articleData.tags === 'string') {
-      articleData.tags = articleData.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+    if (articleData.tags) {
+      if (typeof articleData.tags === 'string') {
+        articleData.tags = articleData.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+      } else if (Array.isArray(articleData.tags)) {
+        articleData.tags = articleData.tags.filter(tag => tag && tag.trim() !== '');
+      }
+    }
+
+    // Traiter les keywords
+    if (articleData.keywords) {
+      if (typeof articleData.keywords === 'string') {
+        articleData.keywords = articleData.keywords.split(',').map(k => k.trim()).filter(k => k);
+      } else if (Array.isArray(articleData.keywords)) {
+        articleData.keywords = articleData.keywords.filter(k => k && k.trim() !== '');
+      }
     }
 
     // Supprimer le champ published car on utilise status
@@ -132,6 +145,24 @@ exports.createArticle = async (req, res) => {
 exports.updateArticle = async (req, res) => {
   try {
     const updateData = { ...req.body };
+
+    // Traiter les tags
+    if (updateData.tags) {
+      if (typeof updateData.tags === 'string') {
+        updateData.tags = updateData.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+      } else if (Array.isArray(updateData.tags)) {
+        updateData.tags = updateData.tags.filter(tag => tag && tag.trim() !== '');
+      }
+    }
+
+    // Traiter les keywords
+    if (updateData.keywords) {
+      if (typeof updateData.keywords === 'string') {
+        updateData.keywords = updateData.keywords.split(',').map(k => k.trim()).filter(k => k);
+      } else if (Array.isArray(updateData.keywords)) {
+        updateData.keywords = updateData.keywords.filter(k => k && k.trim() !== '');
+      }
+    }
 
     // Upload nouvelle image si fournie
     if (req.file) {
@@ -193,21 +224,38 @@ exports.deleteArticle = async (req, res) => {
       });
     }
 
-    // Supprimer l'image de Cloudinary
-    if (article.coverImagePublicId) {
-      await cloudinary.uploader.destroy(article.coverImagePublicId);
+    // Supprimer l'image de Cloudinary si elle existe
+    if (article.coverImagePublicId && article.coverImagePublicId !== 'placeholder') {
+      try {
+        // Vérifier si c'est une image locale ou Cloudinary
+        if (!article.coverImagePublicId.startsWith('article-') && !article.coverImagePublicId.startsWith('cover-')) {
+          await cloudinary.uploader.destroy(article.coverImagePublicId);
+        } else {
+          // Supprimer le fichier local
+          const fs = require('fs');
+          const path = require('path');
+          const filepath = path.join(__dirname, '../uploads', article.coverImagePublicId);
+          if (fs.existsSync(filepath)) {
+            fs.unlinkSync(filepath);
+          }
+        }
+      } catch (deleteError) {
+        console.error('Erreur lors de la suppression de l\'image:', deleteError);
+        // Continuer même si la suppression de l'image échoue
+      }
     }
 
     await Article.findByIdAndDelete(req.params.id);
 
-    res.status(204).json({
+    res.status(200).json({
       status: 'success',
-      data: null
+      message: 'Article supprimé avec succès'
     });
   } catch (error) {
+    console.error('Erreur deleteArticle:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Erreur lors de la suppression'
+      message: error.message || 'Erreur lors de la suppression'
     });
   }
 };
@@ -262,6 +310,24 @@ exports.createEbook = async (req, res) => {
     
     if (ebookData.pages) {
       ebookData.pageCount = parseInt(ebookData.pages) || 0;
+    }
+    
+    // Traiter les tags
+    if (ebookData.tags) {
+      if (typeof ebookData.tags === 'string') {
+        ebookData.tags = ebookData.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+      } else if (Array.isArray(ebookData.tags)) {
+        ebookData.tags = ebookData.tags.filter(tag => tag && tag.trim() !== '');
+      }
+    }
+
+    // Traiter les keywords
+    if (ebookData.keywords) {
+      if (typeof ebookData.keywords === 'string') {
+        ebookData.keywords = ebookData.keywords.split(',').map(k => k.trim()).filter(k => k);
+      } else if (Array.isArray(ebookData.keywords)) {
+        ebookData.keywords = ebookData.keywords.filter(k => k && k.trim() !== '');
+      }
     }
     
     // Traiter les fichiers uploadés
@@ -357,6 +423,24 @@ exports.updateEbook = async (req, res) => {
       });
     }
 
+    // Traiter les tags
+    if (updateData.tags) {
+      if (typeof updateData.tags === 'string') {
+        updateData.tags = updateData.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+      } else if (Array.isArray(updateData.tags)) {
+        updateData.tags = updateData.tags.filter(tag => tag && tag.trim() !== '');
+      }
+    }
+
+    // Traiter les keywords
+    if (updateData.keywords) {
+      if (typeof updateData.keywords === 'string') {
+        updateData.keywords = updateData.keywords.split(',').map(k => k.trim()).filter(k => k);
+      } else if (Array.isArray(updateData.keywords)) {
+        updateData.keywords = updateData.keywords.filter(k => k && k.trim() !== '');
+      }
+    }
+
     // Upload nouvelle image de couverture
     if (req.files?.coverImage) {
       if (ebook.coverImagePublicId) {
@@ -415,15 +499,170 @@ exports.deleteEbook = async (req, res) => {
       });
     }
 
-    // Supprimer les fichiers de Cloudinary
-    if (ebook.coverImagePublicId) {
-      await cloudinary.uploader.destroy(ebook.coverImagePublicId);
+    // Supprimer les fichiers de Cloudinary ou locaux
+    if (ebook.coverImagePublicId && ebook.coverImagePublicId !== 'placeholder') {
+      try {
+        if (!ebook.coverImagePublicId.startsWith('cover-')) {
+          await cloudinary.uploader.destroy(ebook.coverImagePublicId);
+        } else {
+          const fs = require('fs');
+          const path = require('path');
+          const filepath = path.join(__dirname, '../uploads', ebook.coverImagePublicId);
+          if (fs.existsSync(filepath)) {
+            fs.unlinkSync(filepath);
+          }
+        }
+      } catch (deleteError) {
+        console.error('Erreur lors de la suppression de la couverture:', deleteError);
+      }
     }
-    if (ebook.filePublicId) {
-      await cloudinary.uploader.destroy(ebook.filePublicId);
+    
+    if (ebook.pdfFilePublicId && ebook.pdfFilePublicId !== 'placeholder') {
+      try {
+        if (!ebook.pdfFilePublicId.startsWith('pdf-')) {
+          await cloudinary.uploader.destroy(ebook.pdfFilePublicId, { resource_type: 'raw' });
+        } else {
+          const fs = require('fs');
+          const path = require('path');
+          const filepath = path.join(__dirname, '../uploads', ebook.pdfFilePublicId);
+          if (fs.existsSync(filepath)) {
+            fs.unlinkSync(filepath);
+          }
+        }
+      } catch (deleteError) {
+        console.error('Erreur lors de la suppression du PDF:', deleteError);
+      }
     }
 
     await Ebook.findByIdAndDelete(req.params.id);
+
+    res.status(200).json({
+      status: 'success',
+      message: 'E-book supprimé avec succès'
+    });
+  } catch (error) {
+    console.error('Erreur deleteEbook:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'Erreur lors de la suppression'
+    });
+  }
+};
+
+// Gestion des utilisateurs
+exports.getUsers = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, search = '' } = req.query;
+    const skip = (page - 1) * limit;
+
+    const query = search ? {
+      $or: [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ]
+    } : {};
+
+    const [users, total] = await Promise.all([
+      User.find(query)
+        .select('-password')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit)),
+      User.countDocuments(query)
+    ]);
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        users,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit)
+        }
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Erreur lors de la récupération des utilisateurs'
+    });
+  }
+};
+
+exports.getUserById = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Utilisateur non trouvé'
+      });
+    }
+
+    res.status(200).json({
+      status: 'success',
+      data: { user }
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Erreur lors de la récupération de l\'utilisateur'
+    });
+  }
+};
+
+exports.updateUser = async (req, res) => {
+  try {
+    const { name, email, role } = req.body;
+    
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { name, email, role },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Utilisateur non trouvé'
+      });
+    }
+
+    res.status(200).json({
+      status: 'success',
+      data: { user }
+    });
+  } catch (error) {
+    res.status(400).json({
+      status: 'error',
+      message: error.message || 'Erreur lors de la mise à jour'
+    });
+  }
+};
+
+exports.deleteUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    
+    if (!user) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Utilisateur non trouvé'
+      });
+    }
+
+    // Empêcher la suppression de son propre compte
+    if (user._id.toString() === req.user._id.toString()) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Vous ne pouvez pas supprimer votre propre compte'
+      });
+    }
+
+    await User.findByIdAndDelete(req.params.id);
 
     res.status(204).json({
       status: 'success',

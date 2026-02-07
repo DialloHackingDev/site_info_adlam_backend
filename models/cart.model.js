@@ -57,11 +57,10 @@ cartSchema.index({ user: 1 });
 cartSchema.index({ 'items.ebook': 1 });
 
 // Middleware pour calculer les totaux automatiquement
-cartSchema.pre('save', function(next) {
+cartSchema.pre('save', function() {
   this.totalItems = this.items.reduce((total, item) => total + item.quantity, 0);
   this.totalAmount = this.items.reduce((total, item) => total + (item.price * item.quantity), 0);
   this.lastUpdated = new Date();
-  next();
 });
 
 // Méthodes d'instance
@@ -154,10 +153,10 @@ cartSchema.methods.cleanInvalidItems = async function() {
   const validItems = [];
   
   for (const item of this.items) {
-    if (item.ebook && item.ebook.status === 'published') {
+    // Vérifier si l'ebook existe et est publié
+    if (item.ebook && typeof item.ebook === 'object' && item.ebook.status === 'published') {
       // Mettre à jour le prix si nécessaire
-      const currentPrice = item.ebook.getEffectivePrice ? 
-        item.ebook.getEffectivePrice() : item.ebook.price;
+      const currentPrice = item.ebook.discountPrice || item.ebook.price || 0;
       
       if (item.price !== currentPrice) {
         item.price = currentPrice;

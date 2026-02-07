@@ -4,19 +4,42 @@ const Ebook = require('../models/ebook.model');
 // Obtenir le panier de l'utilisateur
 exports.getCart = async (req, res) => {
   try {
-    const cart = await Cart.getCartWithItems(req.user._id);
+    let cart = await Cart.findOne({ user: req.user._id })
+      .populate({
+        path: 'items.ebook',
+        select: 'title slug author price discountPrice discountEndDate coverImage status'
+      });
     
-    // Nettoyer les items invalides
-    await cart.cleanInvalidItems();
+    // Créer un panier vide si aucun n'existe
+    if (!cart) {
+      cart = await Cart.create({ 
+        user: req.user._id, 
+        items: [],
+        totalItems: 0,
+        totalAmount: 0,
+        currency: 'GNF'
+      });
+    }
+    
+    // Nettoyer les items invalides seulement s'il y en a
+    if (cart.items && cart.items.length > 0) {
+      await cart.cleanInvalidItems();
+    }
 
     res.status(200).json({
       status: 'success',
-      data: { cart }
+      data: {
+        items: cart.items || [],
+        totalItems: cart.totalItems || 0,
+        totalAmount: cart.totalAmount || 0,
+        currency: cart.currency || 'GNF'
+      }
     });
   } catch (error) {
+    console.error('Erreur lors de la récupération du panier:', error);
     res.status(500).json({
       status: 'error',
-      message: error.message
+      message: 'Erreur lors de la récupération du panier'
     });
   }
 };
@@ -43,7 +66,16 @@ exports.addToCart = async (req, res) => {
     }
 
     // Obtenir ou créer le panier
-    const cart = await Cart.findOrCreateCart(req.user._id);
+    let cart = await Cart.findOne({ user: req.user._id });
+    if (!cart) {
+      cart = await Cart.create({ 
+        user: req.user._id, 
+        items: [],
+        totalItems: 0,
+        totalAmount: 0,
+        currency: 'GNF'
+      });
+    }
 
     // Vérifier si l'item est déjà dans le panier
     const existingItem = cart.items.find(
@@ -57,22 +89,39 @@ exports.addToCart = async (req, res) => {
       });
     }
 
-    // Ajouter l'item avec le prix effectif
-    const effectivePrice = ebook.getEffectivePrice();
+    // Calculer le prix effectif
+    let effectivePrice = ebook.price || 0;
+    if (ebook.discountPrice && 
+        ebook.discountEndDate && 
+        new Date(ebook.discountEndDate) > new Date()) {
+      effectivePrice = ebook.discountPrice;
+    }
+
+    // Ajouter l'item
     await cart.addItem(ebookId, effectivePrice, parseInt(quantity));
 
     // Récupérer le panier mis à jour avec les détails des e-books
-    const updatedCart = await Cart.getCartWithItems(req.user._id);
+    const updatedCart = await Cart.findOne({ user: req.user._id })
+      .populate({
+        path: 'items.ebook',
+        select: 'title slug author price discountPrice discountEndDate coverImage status'
+      });
 
     res.status(200).json({
       status: 'success',
       message: 'E-book ajouté au panier',
-      data: { cart: updatedCart }
+      data: {
+        items: updatedCart.items || [],
+        totalItems: updatedCart.totalItems || 0,
+        totalAmount: updatedCart.totalAmount || 0,
+        currency: updatedCart.currency || 'GNF'
+      }
     });
   } catch (error) {
+    console.error('Erreur lors de l\'ajout au panier:', error);
     res.status(400).json({
       status: 'error',
-      message: error.message
+      message: 'Erreur lors de l\'ajout au panier'
     });
   }
 };
@@ -177,16 +226,17 @@ exports.clearCart = async (req, res) => {
 exports.getCartCount = async (req, res) => {
   try {
     const cart = await Cart.findOne({ user: req.user._id });
-    const count = cart ? cart.totalItems : 0;
+    const count = cart ? cart.totalItems || 0 : 0;
 
     res.status(200).json({
       status: 'success',
       data: { count }
     });
   } catch (error) {
-    res.status(500).json({
-      status: 'error',
-      message: error.message
+    console.error('Erreur lors de la récupération du nombre d\'items:', error);
+    res.status(200).json({
+      status: 'success',
+      data: { count: 0 }
     });
   }
 };

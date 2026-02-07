@@ -99,6 +99,7 @@ exports.login = async (req, res) => {
     }
 
     const token = signToken(user._id);
+    console.log('Token generated:', token ? 'Yes' : 'No');
 
     const cookieOptions = {
       expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 jours
@@ -108,6 +109,7 @@ exports.login = async (req, res) => {
     };
 
     res.cookie('jwt', token, cookieOptions);
+    console.log('About to send response...');
 
     res.status(200).json({
       status: 'success',
@@ -121,6 +123,7 @@ exports.login = async (req, res) => {
         }
       }
     });
+    console.log('Response sent successfully');
   } catch (error) {
     console.error('Login error details:', error);
     res.status(500).json({

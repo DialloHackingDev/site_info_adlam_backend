@@ -1,7 +1,8 @@
 const express = require('express');
 const multer = require('multer');
 const adminController = require('../controllers/admin.controller');
-const { protect, adminOnly } = require('../middlewares');
+const { protect } = require('../middlewares/auth.middlewares');
+const { adminOnly } = require('../middlewares/authorization');
 const { uploadArticleImage, uploadEbookFiles } = require('../config/cloudinary');
 
 const router = express.Router();
@@ -12,6 +13,12 @@ router.use(adminOnly);
 
 // Routes dashboard
 router.get('/stats', adminController.getDashboardStats);
+
+// Routes utilisateurs
+router.get('/users', adminController.getUsers);
+router.get('/users/:id', adminController.getUserById);
+router.put('/users/:id', adminController.updateUser);
+router.delete('/users/:id', adminController.deleteUser);
 
 // Routes articles
 router.post('/articles', multer({ storage: multer.memoryStorage() }).single('coverImage'), adminController.createArticle);
@@ -30,7 +37,5 @@ router.put('/ebooks/:id', multer({ storage: multer.memoryStorage() }).fields([
 ]), adminController.updateEbook);
 
 router.delete('/ebooks/:id', adminController.deleteEbook);
-
-module.exports = router;
 
 module.exports = router;
