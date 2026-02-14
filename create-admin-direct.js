@@ -16,7 +16,7 @@ const User = mongoose.model('User', userSchema);
 const createAdmin = async () => {
   try {
     // Connexion à la base
-    await mongoose.connect(process.env.MDB_URLS);
+    await mongoose.connect(process.env.MONGODB_URI);
     console.log('✅ Connecté à MongoDB');
 
     // Supprimer l'admin existant si besoin
@@ -26,7 +26,7 @@ const createAdmin = async () => {
     const hashedPassword = await bcrypt.hash('admin123', 12);
     
     const admin = await User.create({
-      name: 'Admin User',
+      name: 'Admin Ousmane',
       email: 'admin@adlam.com',
       password: hashedPassword,
       role: 'admin'
