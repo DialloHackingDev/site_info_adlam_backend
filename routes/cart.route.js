@@ -2,7 +2,6 @@ const express = require('express');
 const cartController = require('../controllers/cart.controller');
 const {
   protect,
-  validateInput,
   validateAddToCart,
   validateUpdateQuantity,
   sanitizeInput
@@ -12,7 +11,6 @@ const router = express.Router();
 
 // Middleware global - authentification requise pour toutes les routes
 router.use(protect);
-router.use(validateInput);
 router.use(sanitizeInput);
 
 // Routes du panier

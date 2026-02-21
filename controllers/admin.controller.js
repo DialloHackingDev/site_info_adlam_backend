@@ -271,10 +271,9 @@ exports.createEbook = async (req, res) => {
     // Ajouter les champs requis
     ebookData.createdBy = req.user._id;
     ebookData.slug = `ebook-${Date.now()}`;
-    ebookData.coverImage = 'https://via.placeholder.com/400x600';
-    ebookData.coverImagePublicId = 'placeholder';
-    ebookData.pdfFile = 'https://via.placeholder.com/file.pdf';
-    ebookData.pdfFilePublicId = 'placeholder';
+    // Ne pas définir d'image par défaut - sera null si non fournie
+    // ebookData.coverImage sera undefined si pas de fichier uploadé
+    // ebookData.pdfFile sera undefined si pas de fichier uploadé
     
     // Convertir les booléens
     if (ebookData.featured === 'true') ebookData.featured = true;

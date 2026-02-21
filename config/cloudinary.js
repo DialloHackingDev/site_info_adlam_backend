@@ -1,6 +1,7 @@
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const multer = require('multer');
+const path = require('path');
 
 // Configuration Cloudinary
 cloudinary.config({
@@ -13,6 +14,31 @@ console.log('Cloudinary configuré:', {
   cloud_name: process.env.CLOUDINARY_CLOUDNAME,
   api_key: process.env.CLOUDINARY_API_KEY ? 'Défini' : 'Non défini',
   api_secret: process.env.CLOUDINARY_API_SECRET ? 'Défini' : 'Non défini'
+});
+
+// Fonction pour sanitiser les noms de fichiers
+const sanitizeFilename = (filename) => {
+  return filename
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9.-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase();
+};
+
+// Stockage local pour les articles (sans caractères spéciaux)
+const localStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/');
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const prefix = file.fieldname === 'pdfFile' ? 'pdf-' : 
+                   file.fieldname === 'coverImage' && req.baseUrl.includes('ebook') ? 'cover-' : 'article-';
+    // Ne garder que le timestamp et l'extension, sans le nom original
+    cb(null, `${prefix}${Date.now()}${ext}`);
+  }
 });
 
 // Configuration du stockage Cloudinary pour les images d'articles
@@ -51,9 +77,9 @@ const ebookPdfStorage = new CloudinaryStorage({
   }
 });
 
-// Middleware multer pour l'upload d'images d'articles
+// Middleware multer pour l'upload d'images d'articles (stockage local)
 const uploadArticleImage = multer({
-  storage: articleImageStorage,
+  storage: localStorage,
   limits: {
     fileSize: 5 * 1024 * 1024 // 5MB max
   },
@@ -96,11 +122,11 @@ const uploadEbookPdf = multer({
   }
 });
 
-// Middleware pour upload multiple (couverture + PDF)
+// Middleware pour upload multiple (couverture + PDF) - stockage local
 const uploadEbookFiles = multer({
-  storage: multer.memoryStorage(),
+  storage: localStorage,
   limits: {
-    fileSize: 10 * 1024 * 1024, // Réduction à 10MB pour éviter DoS
+    fileSize: 10 * 1024 * 1024,
     files: 2
   },
   fileFilter: (req, file, cb) => {

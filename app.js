@@ -36,14 +36,29 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
+// Désactiver le cache en développement
+if (process.env.NODE_ENV !== 'production') {
+  app.use((req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
+    next();
+  });
+}
+
 // Configuration UTF-8 pour supporter les caractères Adlam
 app.use(express.json({ limit: '10mb', charset: 'utf-8' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb', charset: 'utf-8' }));
 app.use(morgan("dev"));
 app.use(cookieParser());
 
-// Servir les fichiers statiques du dossier uploads
-app.use('/uploads', express.static('uploads'));
+// Servir les fichiers statiques du dossier uploads avec décodage UTF-8
+app.use('/uploads', express.static('uploads', {
+  setHeaders: (res, path) => {
+    res.setHeader('Content-Type', 'image/jpeg');
+  }
+}));
 
 // Routes
 app.use('/api/v1/auth', authRouter);
