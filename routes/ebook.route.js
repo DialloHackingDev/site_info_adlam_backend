@@ -34,6 +34,7 @@ router.use(protect);
 
 // Téléchargement sécurisé (après achat)
 router.get('/:id/download', ebookController.generateDownloadUrl);
+router.get('/:id/stream', ebookController.streamPdf);
 
 // Routes admin uniquement
 router.post('/', adminOnly, uploadEbookFiles, validateEbook, ebookController.createEbook);

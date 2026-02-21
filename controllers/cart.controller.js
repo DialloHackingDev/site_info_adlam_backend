@@ -83,22 +83,20 @@ exports.addToCart = async (req, res) => {
     );
 
     if (existingItem) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Cet e-book est déjà dans votre panier'
-      });
-    }
+      // Si l'item existe déjà, incrémenter la quantité
+      await cart.updateItemQuantity(ebookId, existingItem.quantity + parseInt(quantity));
+    } else {
+      // Calculer le prix effectif
+      let effectivePrice = ebook.price || 0;
+      if (ebook.discountPrice && 
+          ebook.discountEndDate && 
+          new Date(ebook.discountEndDate) > new Date()) {
+        effectivePrice = ebook.discountPrice;
+      }
 
-    // Calculer le prix effectif
-    let effectivePrice = ebook.price || 0;
-    if (ebook.discountPrice && 
-        ebook.discountEndDate && 
-        new Date(ebook.discountEndDate) > new Date()) {
-      effectivePrice = ebook.discountPrice;
+      // Ajouter l'item
+      await cart.addItem(ebookId, effectivePrice, parseInt(quantity));
     }
-
-    // Ajouter l'item
-    await cart.addItem(ebookId, effectivePrice, parseInt(quantity));
 
     // Récupérer le panier mis à jour avec les détails des e-books
     const updatedCart = await Cart.findOne({ user: req.user._id })

@@ -558,6 +558,7 @@ exports.getEbookStats = async (req, res) => {
 exports.generateDownloadUrl = async (req, res) => {
   try {
     const { id } = req.params;
+    const Order = require('../models/order.model');
     
     const ebook = await Ebook.findById(id);
     if (!ebook) {
@@ -567,35 +568,88 @@ exports.generateDownloadUrl = async (req, res) => {
       });
     }
 
-    // TODO: Vérifier que l'utilisateur a acheté l'e-book
-    // Cette logique sera implémentée avec le système de commandes
+    // Vérifier que l'utilisateur a acheté l'e-book
+    const order = await Order.findOne({
+      user: req.user._id,
+      'items.ebook': id,
+      status: 'completed'
+    });
 
-    const downloadUrl = EbookFileService.generateSecureDownloadUrl(
-      ebook.pdfFilePublicId,
-      3600 // 1 heure
-    );
-
-    if (!downloadUrl) {
-      return res.status(500).json({
+    if (!order) {
+      return res.status(403).json({
         status: 'error',
-        message: 'Impossible de générer l\'URL de téléchargement'
+        message: 'Vous n\'avez pas accès à ce livre. Veuillez l\'acheter d\'abord.'
       });
     }
 
     // Incrémenter le compteur de téléchargements
     await ebook.incrementDownloads();
 
+    // Retourner l'URL du proxy au lieu de l'URL Cloudinary directe
     res.status(200).json({
       status: 'success',
       data: {
-        downloadUrl,
-        expiresIn: 3600
+        downloadUrl: ebook.pdfFile,
+        title: ebook.title,
+        expiresIn: 24 * 3600
       }
     });
   } catch (error) {
     res.status(500).json({
       status: 'error',
       message: error.message
+    });
+  }
+};
+
+// Proxy pour servir le PDF avec les bons headers CORS
+exports.streamPdf = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const Order = require('../models/order.model');
+    const axios = require('axios');
+    
+    const ebook = await Ebook.findById(id);
+    if (!ebook) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'E-book non trouvé'
+      });
+    }
+
+    // Vérifier que l'utilisateur a acheté l'e-book
+    const order = await Order.findOne({
+      user: req.user._id,
+      'items.ebook': id,
+      status: 'completed'
+    });
+
+    if (!order) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Vous n\'avez pas accès à ce livre'
+      });
+    }
+
+    // Récupérer le PDF depuis Cloudinary
+    const response = await axios.get(ebook.pdfFile, {
+      responseType: 'stream'
+    });
+
+    // Définir les headers appropriés
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${ebook.title}.pdf"`);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+
+    // Streamer le PDF
+    response.data.pipe(res);
+  } catch (error) {
+    console.error('Erreur streaming PDF:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Erreur lors du chargement du PDF'
     });
   }
 };

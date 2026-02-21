@@ -518,7 +518,7 @@ exports.validatePaymentConfirmation = (req, res, next) => {
     });
   }
 
-  if (!paymentIntentId.startsWith('pi_')) {
+  if (!paymentIntentId.startsWith('pi_') && !paymentIntentId.startsWith('sim_')) {
     return res.status(400).json({
       status: 'error',
       message: 'Format PaymentIntent ID invalide'

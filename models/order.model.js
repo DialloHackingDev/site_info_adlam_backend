@@ -30,7 +30,6 @@ const orderItemSchema = new mongoose.Schema({
 const orderSchema = new mongoose.Schema({
   orderNumber: {
     type: String,
-    required: true,
     unique: true
   },
   user: {
@@ -131,16 +130,6 @@ orderSchema.index({ orderNumber: 1 });
 orderSchema.index({ paymentIntentId: 1 });
 orderSchema.index({ status: 1, createdAt: -1 });
 
-// Middleware pour générer le numéro de commande
-orderSchema.pre('save', function(next) {
-  if (this.isNew && !this.orderNumber) {
-    const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substr(2, 5);
-    this.orderNumber = `ADL-${timestamp}-${random}`.toUpperCase();
-  }
-  next();
-});
-
 // Méthodes d'instance
 orderSchema.methods.markAsPaid = function(paymentMethod = null) {
   this.paymentStatus = 'succeeded';
@@ -207,10 +196,15 @@ orderSchema.statics.createFromCart = async function(cart, user, paymentIntentId)
   }));
 
   const subtotal = cart.totalAmount;
-  const fees = 0; // Pas de frais supplémentaires pour l'instant
+  const fees = 0;
   const total = subtotal + fees;
 
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substr(2, 5);
+  const orderNumber = `ADL-${timestamp}-${random}`.toUpperCase();
+
   const order = await this.create({
+    orderNumber,
     user: user._id,
     items: orderItems,
     subtotal,

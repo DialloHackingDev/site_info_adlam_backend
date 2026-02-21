@@ -7,10 +7,15 @@ const EbookFileService = require('../services/ebook-file.service');
 // Créer une session de checkout
 exports.createCheckoutSession = async (req, res) => {
   try {
+    console.log('🔍 createCheckoutSession - User:', req.user?._id);
+    
     // Récupérer le panier de l'utilisateur
     const cart = await Cart.getCartWithItems(req.user._id);
+    console.log('🛒 Cart found:', cart ? 'Yes' : 'No');
+    console.log('🛒 Cart items count:', cart?.items?.length || 0);
     
     if (!cart || cart.items.length === 0) {
+      console.log('❌ Panier vide');
       return res.status(400).json({
         status: 'error',
         message: 'Panier vide'
@@ -18,34 +23,30 @@ exports.createCheckoutSession = async (req, res) => {
     }
 
     // Nettoyer et valider les items
+    console.log('🧹 Cleaning invalid items...');
     await cart.cleanInvalidItems();
+    console.log('✅ Items after cleaning:', cart.items.length);
     
     if (cart.items.length === 0) {
+      console.log('❌ Aucun item valide dans le panier');
       return res.status(400).json({
         status: 'error',
         message: 'Aucun item valide dans le panier'
       });
     }
 
-    // Créer le PaymentIntent Stripe
-    const paymentIntent = await StripeService.createPaymentIntent(
-      cart.totalAmount,
-      cart.currency,
-      {
-        userId: req.user._id.toString(),
-        userEmail: req.user.email,
-        itemCount: cart.totalItems.toString()
-      }
-    );
+    // Pour la simulation, générer un faux paymentIntentId
+    const paymentIntentId = `sim_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // Créer la commande
-    const order = await Order.createFromCart(cart, req.user, paymentIntent.id);
+    console.log('📦 Creating order...');
+    const order = await Order.createFromCart(cart, req.user, paymentIntentId);
+    console.log('✅ Order created:', order._id);
 
     res.status(200).json({
       status: 'success',
       data: {
-        clientSecret: paymentIntent.client_secret,
-        paymentIntentId: paymentIntent.id,
+        paymentIntentId,
         order: {
           id: order._id,
           orderNumber: order.orderNumber,
@@ -55,6 +56,7 @@ exports.createCheckoutSession = async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('❌ Error in createCheckoutSession:', error);
     res.status(400).json({
       status: 'error',
       message: error.message
@@ -74,9 +76,6 @@ exports.confirmPayment = async (req, res) => {
       });
     }
 
-    // Récupérer le PaymentIntent depuis Stripe
-    const paymentIntent = await StripeService.getPaymentIntent(paymentIntentId);
-    
     // Trouver la commande correspondante
     const order = await Order.findByPaymentIntent(paymentIntentId);
     if (!order) {
@@ -94,48 +93,37 @@ exports.confirmPayment = async (req, res) => {
       });
     }
 
-    // Vérifier le statut du paiement
-    if (paymentIntent.status === 'succeeded') {
-      // Marquer la commande comme payée
-      await order.markAsPaid(paymentIntent.payment_method_types?.[0]);
-      
-      // Générer les liens de téléchargement
-      await generateDownloadLinks(order);
-      
-      // Marquer la commande comme complétée
-      await order.markAsCompleted();
-      
-      // Vider le panier
-      const cart = await Cart.findOne({ user: req.user._id });
-      if (cart) {
-        await cart.clear();
-      }
-
-      // Mettre à jour les statistiques des e-books
-      await updateEbookStats(order);
-
-      res.status(200).json({
-        status: 'success',
-        message: 'Paiement confirmé',
-        data: { 
-          order: {
-            id: order._id,
-            orderNumber: order.orderNumber,
-            status: order.status,
-            total: order.total
-          }
-        }
-      });
-    } else {
-      // Marquer la commande comme échouée
-      await order.markAsFailed();
-      
-      res.status(400).json({
-        status: 'error',
-        message: 'Paiement non réussi',
-        data: { paymentStatus: paymentIntent.status }
-      });
+    // Pour la simulation, on considère le paiement comme réussi
+    // Marquer la commande comme payée
+    await order.markAsPaid('simulation');
+    
+    // Générer les liens de téléchargement
+    await generateDownloadLinks(order);
+    
+    // Marquer la commande comme complétée
+    await order.markAsCompleted();
+    
+    // Vider le panier
+    const cart = await Cart.findOne({ user: req.user._id });
+    if (cart) {
+      await cart.clear();
     }
+
+    // Mettre à jour les statistiques des e-books
+    await updateEbookStats(order);
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Paiement confirmé',
+      data: { 
+        order: {
+          id: order._id,
+          orderNumber: order.orderNumber,
+          status: order.status,
+          total: order.total
+        }
+      }
+    });
   } catch (error) {
     res.status(500).json({
       status: 'error',
@@ -302,6 +290,49 @@ exports.downloadEbook = async (req, res) => {
       }
     });
   } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+};
+
+// Obtenir les e-books achetés par l'utilisateur
+exports.getPurchasedEbooks = async (req, res) => {
+  try {
+    const orders = await Order.find({
+      user: req.user._id,
+      status: 'completed'
+    }).populate('items.ebook');
+
+    // Extraire les ebooks uniques avec leurs informations d'achat
+    const ebooksMap = new Map();
+    
+    orders.forEach(order => {
+      order.items.forEach(item => {
+        if (item.ebook && item.ebook.status === 'published') {
+          const ebookId = item.ebook._id.toString();
+          if (!ebooksMap.has(ebookId)) {
+            ebooksMap.set(ebookId, {
+              ...item.ebook.toObject(),
+              purchaseDate: order.paidAt || order.createdAt,
+              orderId: order._id,
+              orderNumber: order.orderNumber
+            });
+          }
+        }
+      });
+    });
+
+    const ebooks = Array.from(ebooksMap.values());
+
+    res.status(200).json({
+      status: 'success',
+      results: ebooks.length,
+      data: { ebooks }
+    });
+  } catch (error) {
+    console.error('Error fetching purchased ebooks:', error);
     res.status(500).json({
       status: 'error',
       message: error.message

@@ -27,4 +27,7 @@ router.get('/orders', checkoutController.getUserOrders);
 router.get('/orders/:orderId', checkoutController.getOrder);
 router.get('/orders/:orderId/download/:ebookId', checkoutController.downloadEbook);
 
+// Route pour récupérer les ebooks achetés
+router.get('/purchased-ebooks', checkoutController.getPurchasedEbooks);
+
 module.exports = router;
