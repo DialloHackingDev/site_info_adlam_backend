@@ -53,10 +53,19 @@ app.use(express.urlencoded({ extended: true, limit: '10mb', charset: 'utf-8' }))
 app.use(morgan("dev"));
 app.use(cookieParser());
 
-// Servir les fichiers statiques du dossier uploads avec décodage UTF-8
+// Servir les fichiers statiques du dossier uploads
 app.use('/uploads', express.static('uploads', {
   setHeaders: (res, path) => {
-    res.setHeader('Content-Type', 'image/jpeg');
+    // Détecter le type de fichier
+    if (path.endsWith('.pdf')) {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline');
+    } else if (path.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+      res.setHeader('Content-Type', 'image/jpeg');
+    }
+    // Headers CORS pour permettre l'accès depuis le frontend
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET');
   }
 }));
 

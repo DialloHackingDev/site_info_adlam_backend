@@ -122,11 +122,11 @@ const uploadEbookPdf = multer({
   }
 });
 
-// Middleware pour upload multiple (couverture + PDF) - stockage local
+// Middleware pour upload multiple (couverture + PDF) - stockage Cloudinary
 const uploadEbookFiles = multer({
-  storage: localStorage,
+  storage: multer.memoryStorage(), // Utiliser memoryStorage pour Cloudinary
   limits: {
-    fileSize: 10 * 1024 * 1024,
+    fileSize: 50 * 1024 * 1024, // 50MB pour les PDFs
     files: 2
   },
   fileFilter: (req, file, cb) => {

@@ -568,24 +568,26 @@ exports.generateDownloadUrl = async (req, res) => {
       });
     }
 
-    // Vérifier que l'utilisateur a acheté l'e-book
-    const order = await Order.findOne({
-      user: req.user._id,
-      'items.ebook': id,
-      status: 'completed'
-    });
-
-    if (!order) {
-      return res.status(403).json({
-        status: 'error',
-        message: 'Vous n\'avez pas accès à ce livre. Veuillez l\'acheter d\'abord.'
+    // Vérifier que l'utilisateur a acheté l'e-book OU que c'est gratuit
+    if (ebook.price > 0) {
+      const order = await Order.findOne({
+        user: req.user._id,
+        'items.ebook': id,
+        status: 'completed'
       });
+
+      if (!order) {
+        return res.status(403).json({
+          status: 'error',
+          message: 'Vous n\'avez pas accès à ce livre. Veuillez l\'acheter d\'abord.'
+        });
+      }
     }
 
     // Incrémenter le compteur de téléchargements
     await ebook.incrementDownloads();
 
-    // Retourner l'URL du proxy au lieu de l'URL Cloudinary directe
+    // Retourner l'URL du fichier (Cloudinary ou local)
     res.status(200).json({
       status: 'success',
       data: {
@@ -608,6 +610,8 @@ exports.streamPdf = async (req, res) => {
     const { id } = req.params;
     const Order = require('../models/order.model');
     const axios = require('axios');
+    const fs = require('fs');
+    const path = require('path');
     
     const ebook = await Ebook.findById(id);
     if (!ebook) {
@@ -617,34 +621,63 @@ exports.streamPdf = async (req, res) => {
       });
     }
 
-    // Vérifier que l'utilisateur a acheté l'e-book
-    const order = await Order.findOne({
-      user: req.user._id,
-      'items.ebook': id,
-      status: 'completed'
-    });
-
-    if (!order) {
-      return res.status(403).json({
-        status: 'error',
-        message: 'Vous n\'avez pas accès à ce livre'
+    // Vérifier que l'utilisateur a acheté l'e-book OU que c'est gratuit
+    if (ebook.price > 0) {
+      const order = await Order.findOne({
+        user: req.user._id,
+        'items.ebook': id,
+        status: 'completed'
       });
+
+      if (!order) {
+        return res.status(403).json({
+          status: 'error',
+          message: 'Vous n\'avez pas accès à ce livre'
+        });
+      }
     }
 
-    // Récupérer le PDF depuis Cloudinary
-    const response = await axios.get(ebook.pdfFile, {
-      responseType: 'stream'
-    });
+    // Vérifier si le fichier est sur Cloudinary ou local
+    if (ebook.pdfFile.includes('cloudinary.com')) {
+      // Fichier sur Cloudinary - streamer depuis Cloudinary
+      const response = await axios.get(ebook.pdfFile, {
+        responseType: 'arraybuffer',
+        headers: {
+          'Accept': 'application/pdf',
+          'Accept-Encoding': 'identity'
+        },
+        decompress: false
+      });
 
-    // Définir les headers appropriés
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="${ebook.title}.pdf"`);
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET');
-    res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(ebook.title)}.pdf"`);
+      res.setHeader('Content-Length', response.data.byteLength);
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
 
-    // Streamer le PDF
-    response.data.pipe(res);
+      res.send(Buffer.from(response.data));
+    } else {
+      // Fichier local - servir depuis /uploads/
+      const filePath = path.join(__dirname, '..', ebook.pdfFile);
+      
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({
+          status: 'error',
+          message: 'Fichier PDF introuvable'
+        });
+      }
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(ebook.title)}.pdf"`);
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.pipe(res);
+    }
   } catch (error) {
     console.error('Erreur streaming PDF:', error);
     res.status(500).json({

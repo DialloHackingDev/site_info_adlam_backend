@@ -129,8 +129,10 @@ class EbookFileService {
       // Traiter la couverture
       if (files.coverImage && files.coverImage[0]) {
         const coverFile = files.coverImage[0];
+        // Vérifier si c'est un buffer (memoryStorage) ou un fichier (diskStorage)
+        const buffer = coverFile.buffer || require('fs').readFileSync(coverFile.path);
         results.cover = await this.uploadCover(
-          coverFile.buffer, 
+          buffer, 
           coverFile.originalname
         );
       }
@@ -138,8 +140,10 @@ class EbookFileService {
       // Traiter le PDF
       if (files.pdfFile && files.pdfFile[0]) {
         const pdfFile = files.pdfFile[0];
+        // Vérifier si c'est un buffer (memoryStorage) ou un fichier (diskStorage)
+        const buffer = pdfFile.buffer || require('fs').readFileSync(pdfFile.path);
         results.pdf = await this.uploadPdf(
-          pdfFile.buffer, 
+          buffer, 
           pdfFile.originalname
         );
 
@@ -183,8 +187,9 @@ class EbookFileService {
       // Mettre à jour la couverture si fournie
       if (files.coverImage && files.coverImage[0]) {
         const coverFile = files.coverImage[0];
+        const buffer = coverFile.buffer || require('fs').readFileSync(coverFile.path);
         results.cover = await this.uploadCover(
-          coverFile.buffer, 
+          buffer, 
           coverFile.originalname
         );
       }
@@ -192,8 +197,9 @@ class EbookFileService {
       // Mettre à jour le PDF si fourni
       if (files.pdfFile && files.pdfFile[0]) {
         const pdfFile = files.pdfFile[0];
+        const buffer = pdfFile.buffer || require('fs').readFileSync(pdfFile.path);
         results.pdf = await this.uploadPdf(
-          pdfFile.buffer, 
+          buffer, 
           pdfFile.originalname
         );
 

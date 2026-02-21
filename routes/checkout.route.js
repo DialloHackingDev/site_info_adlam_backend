@@ -30,4 +30,7 @@ router.get('/orders/:orderId/download/:ebookId', checkoutController.downloadEboo
 // Route pour récupérer les ebooks achetés
 router.get('/purchased-ebooks', checkoutController.getPurchasedEbooks);
 
+// Route pour ajouter un ebook gratuit à la bibliothèque
+router.post('/add-free-ebook', checkoutController.addFreeEbookToLibrary);
+
 module.exports = router;

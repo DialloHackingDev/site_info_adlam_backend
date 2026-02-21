@@ -340,6 +340,82 @@ exports.getPurchasedEbooks = async (req, res) => {
   }
 };
 
+// Ajouter un ebook gratuit à la bibliothèque de l'utilisateur
+exports.addFreeEbookToLibrary = async (req, res) => {
+  try {
+    const { ebookId } = req.body;
+
+    const ebook = await Ebook.findById(ebookId);
+    if (!ebook) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'E-book non trouvé'
+      });
+    }
+
+    if (ebook.price > 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Cet e-book n\'est pas gratuit'
+      });
+    }
+
+    // Vérifier si l'utilisateur a déjà cet ebook
+    const existingOrder = await Order.findOne({
+      user: req.user._id,
+      'items.ebook': ebookId,
+      status: 'completed'
+    });
+
+    if (existingOrder) {
+      return res.status(200).json({
+        status: 'success',
+        message: 'E-book déjà dans votre bibliothèque',
+        data: { alreadyOwned: true }
+      });
+    }
+
+    // Créer une commande gratuite
+    const orderNumber = `ADL-FREE-${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 5)}`.toUpperCase();
+    const paymentIntentId = `free_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    const order = await Order.create({
+      orderNumber,
+      user: req.user._id,
+      items: [{
+        ebook: ebook._id,
+        title: ebook.title,
+        author: ebook.author,
+        price: 0,
+        quantity: 1
+      }],
+      subtotal: 0,
+      fees: 0,
+      total: 0,
+      currency: ebook.currency,
+      paymentIntentId,
+      paymentStatus: 'succeeded',
+      status: 'completed',
+      customerEmail: req.user.email,
+      customerName: req.user.name,
+      paidAt: new Date(),
+      completedAt: new Date()
+    });
+
+    res.status(201).json({
+      status: 'success',
+      message: 'E-book gratuit ajouté à votre bibliothèque',
+      data: { order }
+    });
+  } catch (error) {
+    console.error('Error adding free ebook:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+};
+
 // Fonctions utilitaires
 async function generateDownloadLinks(order) {
   for (const item of order.items) {

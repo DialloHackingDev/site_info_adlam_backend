@@ -21,9 +21,14 @@ exports.getCart = async (req, res) => {
       });
     }
     
-    // Nettoyer les items invalides seulement s'il y en a
+    // Nettoyer les items invalides seulement s'il y en a et qu'ils sont peuplés
     if (cart.items && cart.items.length > 0) {
-      await cart.cleanInvalidItems();
+      try {
+        await cart.cleanInvalidItems();
+      } catch (cleanError) {
+        console.error('Erreur cleanInvalidItems:', cleanError);
+        // Continuer même si le nettoyage échoue
+      }
     }
 
     res.status(200).json({
@@ -39,7 +44,8 @@ exports.getCart = async (req, res) => {
     console.error('Erreur lors de la récupération du panier:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Erreur lors de la récupération du panier'
+      message: 'Erreur lors de la récupération du panier',
+      error: error.message
     });
   }
 };
