@@ -7,6 +7,12 @@ exports.validateContentType = (req, res, next) => {
     return next();
   }
   
+  // Ignorer la validation pour les requêtes sans body (GET, DELETE, ou requêtes sans Content-Length)
+  const contentLength = req.get('content-length');
+  if (!contentLength || contentLength === '0') {
+    return next();
+  }
+  
   if (['POST', 'PUT', 'PATCH'].includes(req.method) && !req.is('application/json')) {
     return res.status(400).json({
       status: 'error',
