@@ -2,6 +2,11 @@
  * Middleware de validation Content-Type pour prévenir CSRF
  */
 exports.validateContentType = (req, res, next) => {
+  // Ignorer la validation pour les requêtes OPTIONS (CORS preflight)
+  if (req.method === 'OPTIONS') {
+    return next();
+  }
+  
   // Ignorer la validation pour les uploads de fichiers (multipart/form-data)
   if (req.is('multipart/form-data')) {
     return next();

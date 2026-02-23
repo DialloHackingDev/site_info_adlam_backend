@@ -37,9 +37,9 @@ app.use(helmet({
   contentSecurityPolicy: false
 }));
 
-// Middleware de sécurité globaux - Désactivé temporairement pour déboguer
-// app.use(validateContentType);
-// app.use(limitRequestSize('10mb'));
+// Middleware de sécurité globaux
+app.use(validateContentType);
+app.use(limitRequestSize('10mb'));
 
 // CORS - Configuration simplifiée pour déboguer
 const allowedOrigins = [
