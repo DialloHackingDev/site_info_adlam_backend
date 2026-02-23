@@ -7,7 +7,6 @@ const mongoURI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/adlam";
 const connectDB = async () => {
   try {
     const options = {
-    
       socketTimeoutMS: 45000,
       maxPoolSize: 10
     };
@@ -20,6 +19,19 @@ const connectDB = async () => {
     setTimeout(connectDB, 5000);
   }
 };
+
+// Gestion des événements MongoDB
+mongoose.connection.on('error', (err) => {
+  console.error('❌ Erreur MongoDB:', err);
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.log('⚠️ MongoDB déconnecté');
+});
+
+mongoose.connection.on('reconnected', () => {
+  console.log('✅ MongoDB reconnecté');
+});
 
 connectDB();
 

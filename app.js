@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const helmet = require('helmet');
 const morgan = require("morgan");
 const cookieParser = require('cookie-parser');
 const { validateContentType, limitRequestSize } = require('./middlewares');
@@ -25,12 +26,37 @@ const contactRouter = require('./routes/contact.route');
 
 const app = express();
 
+// Trust proxy pour Render
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
+// Sécurité avec Helmet
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: false
+}));
+
 // Middleware de sécurité globaux
 app.use(validateContentType);
 app.use(limitRequestSize('10mb'));
 
+// CORS - Support production et développement
+const allowedOrigins = process.env.NODE_ENV === 'production'
+  ? [
+      process.env.FRONTEND_URL || 'https://adlam-fulani-front.vercel.app',
+      'https://adlam-fulani-front.vercel.app'
+    ]
+  : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176'];
+
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5174','http://localhost:5175','http://localhost:5176'], // Support des deux ports
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
