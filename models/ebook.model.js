@@ -38,19 +38,19 @@ const ebookSchema = new mongoose.Schema({
   // Fichiers
   coverImage: {
     type: String,
-    required: true
+    default: null
   },
   coverImagePublicId: {
     type: String,
-    required: true
+    default: null
   },
   pdfFile: {
     type: String,
-    required: true
+    default: null
   },
   pdfFilePublicId: {
     type: String,
-    required: true
+    default: null
   },
   // Métadonnées du livre
   pageCount: {

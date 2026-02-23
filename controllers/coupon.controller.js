@@ -44,7 +44,6 @@ exports.validateCoupon = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error validating coupon:', error);
     res.status(500).json({
       status: 'error',
       message: 'Erreur lors de la validation du coupon'
@@ -73,7 +72,6 @@ exports.applyCoupon = async (req, res) => {
       message: 'Code promo appliqué avec succès'
     });
   } catch (error) {
-    console.error('Error applying coupon:', error);
     res.status(500).json({
       status: 'error',
       message: 'Erreur lors de l\'application du coupon'
@@ -96,7 +94,6 @@ exports.createCoupon = async (req, res) => {
       data: { coupon }
     });
   } catch (error) {
-    console.error('Error creating coupon:', error);
     res.status(400).json({
       status: 'error',
       message: error.message || 'Erreur lors de la création du coupon'
@@ -129,7 +126,6 @@ exports.getCoupons = async (req, res) => {
       data: { coupons }
     });
   } catch (error) {
-    console.error('Error fetching coupons:', error);
     res.status(500).json({
       status: 'error',
       message: 'Erreur lors de la récupération des coupons'
@@ -158,7 +154,6 @@ exports.updateCoupon = async (req, res) => {
       data: { coupon }
     });
   } catch (error) {
-    console.error('Error updating coupon:', error);
     res.status(400).json({
       status: 'error',
       message: error.message || 'Erreur lors de la mise à jour du coupon'
@@ -184,7 +179,6 @@ exports.deleteCoupon = async (req, res) => {
       message: 'Coupon supprimé avec succès'
     });
   } catch (error) {
-    console.error('Error deleting coupon:', error);
     res.status(500).json({
       status: 'error',
       message: 'Erreur lors de la suppression du coupon'
@@ -224,7 +218,6 @@ exports.getCouponStats = async (req, res) => {
       data: { stats: stats[0] || { totalCoupons: 0, activeCoupons: 0, totalUsage: 0 } }
     });
   } catch (error) {
-    console.error('Error fetching coupon stats:', error);
     res.status(500).json({
       status: 'error',
       message: 'Erreur lors de la récupération des statistiques'

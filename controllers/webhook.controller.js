@@ -10,14 +10,12 @@ exports.handleStripeWebhook = async (req, res) => {
     const signature = req.headers['stripe-signature'];
     event = StripeService.constructWebhookEvent(req.body, signature);
   } catch (error) {
-    console.error('❌ Erreur webhook Stripe:', error.message);
     return res.status(400).json({
       status: 'error',
       message: 'Webhook signature invalide'
     });
   }
 
-  console.log(`📨 Webhook Stripe reçu: ${event.type}`);
 
   try {
     // Traiter les différents types d'événements
@@ -39,12 +37,10 @@ exports.handleStripeWebhook = async (req, res) => {
         break;
 
       default:
-        console.log(`⚠️ Événement non géré: ${event.type}`);
     }
 
     res.status(200).json({ received: true });
   } catch (error) {
-    console.error('❌ Erreur traitement webhook:', error);
     res.status(500).json({
       status: 'error',
       message: 'Erreur traitement webhook'
@@ -55,17 +51,14 @@ exports.handleStripeWebhook = async (req, res) => {
 // Traiter un paiement réussi
 async function handlePaymentSucceeded(paymentIntent) {
   try {
-    console.log(`✅ Paiement réussi: ${paymentIntent.id}`);
     
     const order = await Order.findByPaymentIntent(paymentIntent.id);
     if (!order) {
-      console.error(`❌ Commande non trouvée pour PaymentIntent: ${paymentIntent.id}`);
       return;
     }
 
     // Éviter le double traitement
     if (order.paymentStatus === 'succeeded') {
-      console.log(`⚠️ Paiement déjà traité pour la commande: ${order.orderNumber}`);
       return;
     }
 
@@ -81,48 +74,40 @@ async function handlePaymentSucceeded(paymentIntent) {
     // Mettre à jour les statistiques des e-books
     await updateEbookStats(order);
 
-    console.log(`✅ Commande ${order.orderNumber} traitée avec succès`);
     
     // TODO: Envoyer un email de confirmation à l'utilisateur
     // await sendOrderConfirmationEmail(order);
     
   } catch (error) {
-    console.error('❌ Erreur traitement paiement réussi:', error);
   }
 }
 
 // Traiter un paiement échoué
 async function handlePaymentFailed(paymentIntent) {
   try {
-    console.log(`❌ Paiement échoué: ${paymentIntent.id}`);
     
     const order = await Order.findByPaymentIntent(paymentIntent.id);
     if (!order) {
-      console.error(`❌ Commande non trouvée pour PaymentIntent: ${paymentIntent.id}`);
       return;
     }
 
     // Marquer la commande comme échouée
     await order.markAsFailed();
     
-    console.log(`❌ Commande ${order.orderNumber} marquée comme échouée`);
     
     // TODO: Envoyer un email d'échec de paiement
     // await sendPaymentFailedEmail(order);
     
   } catch (error) {
-    console.error('❌ Erreur traitement paiement échoué:', error);
   }
 }
 
 // Traiter un paiement annulé
 async function handlePaymentCanceled(paymentIntent) {
   try {
-    console.log(`🚫 Paiement annulé: ${paymentIntent.id}`);
     
     const order = await Order.findByPaymentIntent(paymentIntent.id);
     if (!order) {
-      console.error(`❌ Commande non trouvée pour PaymentIntent: ${paymentIntent.id}`);
       return;
     }
 
@@ -131,17 +116,14 @@ async function handlePaymentCanceled(paymentIntent) {
     order.status = 'failed';
     await order.save();
     
-    console.log(`🚫 Commande ${order.orderNumber} annulée`);
     
   } catch (error) {
-    console.error('❌ Erreur traitement paiement annulé:', error);
   }
 }
 
 // Traiter une contestation de charge
 async function handleChargeDispute(charge) {
   try {
-    console.log(`⚠️ Contestation de charge: ${charge.id}`);
     
     // TODO: Implémenter la gestion des contestations
     // - Notifier les administrateurs
@@ -149,7 +131,6 @@ async function handleChargeDispute(charge) {
     // - Préparer les documents de défense
     
   } catch (error) {
-    console.error('❌ Erreur traitement contestation:', error);
   }
 }
 

@@ -63,7 +63,6 @@ exports.createArticle = async (req, res) => {
   } catch (error) {
     // Supprimer l'image uploadée en cas d'erreur
     if (req.uploadedImagePublicId) {
-      await deleteImage(req.uploadedImagePublicId).catch(console.error);
     }
     
     if (error.code === 11000) {
@@ -82,7 +81,6 @@ exports.createArticle = async (req, res) => {
 // Obtenir tous les articles (avec filtres)
 exports.getAllArticles = async (req, res) => {
   try {
-    console.log('🔍 getAllArticles appelé avec query:', req.query);
     const {
       page = 1,
       limit = 10,
@@ -110,7 +108,6 @@ exports.getAllArticles = async (req, res) => {
       query.status = 'published';
     }
 
-    console.log('🔍 Query MongoDB:', query);
 
     let articles;
     let total;
@@ -137,7 +134,6 @@ exports.getAllArticles = async (req, res) => {
       total = await Article.countDocuments(query);
     }
 
-    console.log('📊 Articles trouvés:', articles.length, 'Total:', total);
 
     res.status(200).json({
       status: 'success',
@@ -151,7 +147,6 @@ exports.getAllArticles = async (req, res) => {
       data: { articles }
     });
   } catch (error) {
-    console.error('❌ Erreur getAllArticles:', error);
     res.status(500).json({
       status: 'error',
       message: error.message
@@ -269,7 +264,6 @@ exports.updateArticle = async (req, res) => {
         
         // Supprimer l'ancienne image
         if (oldImagePublicId) {
-          await deleteImage(oldImagePublicId).catch(console.error);
         }
       }
     }
@@ -327,7 +321,6 @@ exports.deleteArticle = async (req, res) => {
 
     // Supprimer l'image de couverture si elle existe
     if (article.coverImagePublicId) {
-      await deleteImage(article.coverImagePublicId).catch(console.error);
     }
 
     await Article.findByIdAndDelete(id);
@@ -347,10 +340,8 @@ exports.deleteArticle = async (req, res) => {
 // Obtenir les articles récents (pour la page d'accueil)
 exports.getRecentArticles = async (req, res) => {
   try {
-    console.log('🔍 getRecentArticles appelé avec limit:', req.query.limit);
     const { limit = 5 } = req.query;
     const articles = await Article.getRecent(parseInt(limit));
-    console.log('📊 Articles récents trouvés:', articles.length);
 
     res.status(200).json({
       status: 'success',
@@ -358,7 +349,6 @@ exports.getRecentArticles = async (req, res) => {
       data: { articles }
     });
   } catch (error) {
-    console.error('❌ Erreur getRecentArticles:', error);
     res.status(500).json({
       status: 'error',
       message: error.message
@@ -445,10 +435,8 @@ exports.toggleLike = async (req, res) => {
 // Obtenir les articles en vedette
 exports.getFeaturedArticles = async (req, res) => {
   try {
-    console.log('🔍 getFeaturedArticles appelé avec limit:', req.query.limit);
     const { limit = 3 } = req.query;
     const articles = await Article.getFeatured(parseInt(limit));
-    console.log('📊 Articles trouvés:', articles.length);
 
     res.status(200).json({
       status: 'success',
@@ -456,7 +444,6 @@ exports.getFeaturedArticles = async (req, res) => {
       data: { articles: articles.map(article => article.getPublicData()) }
     });
   } catch (error) {
-    console.error('❌ Erreur getFeaturedArticles:', error);
     res.status(500).json({
       status: 'error',
       message: error.message

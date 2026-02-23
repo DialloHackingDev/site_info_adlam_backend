@@ -150,17 +150,9 @@ cartSchema.statics.getCartWithItems = async function(userId) {
 
 // Méthode pour nettoyer les items avec des e-books supprimés ou non disponibles
 cartSchema.methods.cleanInvalidItems = async function() {
-  console.log('🧹 cleanInvalidItems - Starting with', this.items.length, 'items');
   const validItems = [];
   
   for (const item of this.items) {
-    console.log('📖 Checking item:', {
-      hasEbook: !!item.ebook,
-      isObject: typeof item.ebook === 'object',
-      status: item.ebook?.status,
-      title: item.ebook?.title
-    });
-    
     // Vérifier si l'ebook existe et est publié
     if (item.ebook && typeof item.ebook === 'object' && item.ebook.status === 'published') {
       // Mettre à jour le prix si nécessaire
@@ -171,13 +163,9 @@ cartSchema.methods.cleanInvalidItems = async function() {
       }
       
       validItems.push(item);
-      console.log('✅ Item valid:', item.ebook.title);
-    } else {
-      console.log('❌ Item invalid - status:', item.ebook?.status);
     }
   }
   
-  console.log('✅ Valid items count:', validItems.length);
   this.items = validItems;
   return this.save();
 };

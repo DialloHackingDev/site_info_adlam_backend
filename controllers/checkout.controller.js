@@ -7,15 +7,11 @@ const EbookFileService = require('../services/ebook-file.service');
 // Créer une session de checkout
 exports.createCheckoutSession = async (req, res) => {
   try {
-    console.log('🔍 createCheckoutSession - User:', req.user?._id);
     
     // Récupérer le panier de l'utilisateur
     const cart = await Cart.getCartWithItems(req.user._id);
-    console.log('🛒 Cart found:', cart ? 'Yes' : 'No');
-    console.log('🛒 Cart items count:', cart?.items?.length || 0);
     
     if (!cart || cart.items.length === 0) {
-      console.log('❌ Panier vide');
       return res.status(400).json({
         status: 'error',
         message: 'Panier vide'
@@ -23,12 +19,9 @@ exports.createCheckoutSession = async (req, res) => {
     }
 
     // Nettoyer et valider les items
-    console.log('🧹 Cleaning invalid items...');
     await cart.cleanInvalidItems();
-    console.log('✅ Items after cleaning:', cart.items.length);
     
     if (cart.items.length === 0) {
-      console.log('❌ Aucun item valide dans le panier');
       return res.status(400).json({
         status: 'error',
         message: 'Aucun item valide dans le panier'
@@ -39,9 +32,7 @@ exports.createCheckoutSession = async (req, res) => {
     const paymentIntentId = `sim_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // Créer la commande
-    console.log('📦 Creating order...');
     const order = await Order.createFromCart(cart, req.user, paymentIntentId);
-    console.log('✅ Order created:', order._id);
 
     res.status(200).json({
       status: 'success',
@@ -56,7 +47,6 @@ exports.createCheckoutSession = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Error in createCheckoutSession:', error);
     res.status(400).json({
       status: 'error',
       message: error.message
@@ -332,7 +322,6 @@ exports.getPurchasedEbooks = async (req, res) => {
       data: { ebooks }
     });
   } catch (error) {
-    console.error('Error fetching purchased ebooks:', error);
     res.status(500).json({
       status: 'error',
       message: error.message
@@ -408,7 +397,6 @@ exports.addFreeEbookToLibrary = async (req, res) => {
       data: { order }
     });
   } catch (error) {
-    console.error('Error adding free ebook:', error);
     res.status(500).json({
       status: 'error',
       message: error.message

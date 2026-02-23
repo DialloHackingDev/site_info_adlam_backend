@@ -41,15 +41,12 @@ exports.getDashboardStats = async (req, res) => {
 // Créer un article
 exports.createArticle = async (req, res) => {
   try {
-    console.log('Creating article with data:', req.body);
-    console.log('File received:', req.file ? 'Yes' : 'No');
 
     const articleData = { ...req.body, author: req.user._id };
 
     // Upload de l'image de couverture si fournie
     if (req.file) {
       try {
-        console.log('Saving image locally:', req.file.originalname);
         
         const fs = require('fs');
         const path = require('path');
@@ -67,9 +64,7 @@ exports.createArticle = async (req, res) => {
         
         articleData.coverImage = `http://localhost:5000/uploads/${filename}`;
         articleData.coverImagePublicId = filename;
-        console.log('Image saved successfully:', articleData.coverImage);
       } catch (uploadError) {
-        console.error('File save error:', uploadError);
         return res.status(400).json({
           status: 'error',
           message: 'Erreur lors de l\'upload de l\'image: ' + uploadError.message
@@ -81,7 +76,6 @@ exports.createArticle = async (req, res) => {
     const timestamp = Date.now();
     const randomNum = Math.floor(Math.random() * 1000);
     articleData.slug = `article-${timestamp}-${randomNum}`;
-    console.log('Generated slug:', articleData.slug);
 
     // Convertir les booléens string en booléens
     if (articleData.featured === 'true') articleData.featured = true;
@@ -124,7 +118,6 @@ exports.createArticle = async (req, res) => {
     // Supprimer le champ published car on utilise status
     delete articleData.published;
 
-    console.log('Final article data:', articleData);
 
     const article = await Article.create(articleData);
 
@@ -133,7 +126,6 @@ exports.createArticle = async (req, res) => {
       data: { article }
     });
   } catch (error) {
-    console.error('Create article error:', error);
     res.status(400).json({
       status: 'error',
       message: error.message || 'Erreur lors de la création de l\'article'
@@ -240,7 +232,6 @@ exports.deleteArticle = async (req, res) => {
           }
         }
       } catch (deleteError) {
-        console.error('Erreur lors de la suppression de l\'image:', deleteError);
         // Continuer même si la suppression de l'image échoue
       }
     }
@@ -252,7 +243,6 @@ exports.deleteArticle = async (req, res) => {
       message: 'Article supprimé avec succès'
     });
   } catch (error) {
-    console.error('Erreur deleteArticle:', error);
     res.status(500).json({
       status: 'error',
       message: error.message || 'Erreur lors de la suppression'
@@ -263,8 +253,6 @@ exports.deleteArticle = async (req, res) => {
 // Créer un e-book
 exports.createEbook = async (req, res) => {
   try {
-    console.log('Creating ebook with data:', req.body);
-    console.log('Files received:', req.files);
     
     const ebookData = { ...req.body };
     
@@ -330,10 +318,8 @@ exports.createEbook = async (req, res) => {
     }
     
     // Traiter les fichiers uploadés
-    console.log('Checking for files...', req.files ? 'Files found' : 'No files');
     if (req.files) {
       try {
-        console.log('Processing files...');
         
         // Upload image de couverture localement
         if (req.files.coverImage && req.files.coverImage[0]) {
@@ -353,7 +339,6 @@ exports.createEbook = async (req, res) => {
           
           ebookData.coverImage = `/uploads/${filename}`;
           ebookData.coverImagePublicId = filename;
-          console.log('Cover image saved:', ebookData.coverImage);
         }
         
         // Upload fichier PDF localement
@@ -375,12 +360,9 @@ exports.createEbook = async (req, res) => {
           ebookData.pdfFile = `/uploads/${filename}`;
           ebookData.pdfFilePublicId = filename;
           ebookData.fileSize = pdfFile.size;
-          console.log('PDF file saved:', ebookData.pdfFile);
         }
         
-        console.log('Files processed successfully');
       } catch (fileError) {
-        console.error('Error processing files:', fileError);
         return res.status(400).json({
           status: 'error',
           message: 'Erreur lors du traitement des fichiers: ' + fileError.message
@@ -392,7 +374,6 @@ exports.createEbook = async (req, res) => {
     delete ebookData.published;
     delete ebookData.pages;
     
-    console.log('Final ebook data before creation:', ebookData);
     
     const ebook = await Ebook.create(ebookData);
     
@@ -401,7 +382,7 @@ exports.createEbook = async (req, res) => {
       data: { ebook }
     });
   } catch (error) {
-    console.error('Create ebook error details:', error);
+    console.error('❌ Erreur création ebook:', error.message);
     res.status(400).json({
       status: 'error',
       message: error.message || 'Erreur lors de la création de l\'e-book'
@@ -512,7 +493,6 @@ exports.deleteEbook = async (req, res) => {
           }
         }
       } catch (deleteError) {
-        console.error('Erreur lors de la suppression de la couverture:', deleteError);
       }
     }
     
@@ -529,7 +509,6 @@ exports.deleteEbook = async (req, res) => {
           }
         }
       } catch (deleteError) {
-        console.error('Erreur lors de la suppression du PDF:', deleteError);
       }
     }
 
@@ -540,7 +519,6 @@ exports.deleteEbook = async (req, res) => {
       message: 'E-book supprimé avec succès'
     });
   } catch (error) {
-    console.error('Erreur deleteEbook:', error);
     res.status(500).json({
       status: 'error',
       message: error.message || 'Erreur lors de la suppression'

@@ -22,14 +22,12 @@ exports.sendMessage = async (req, res) => {
 
     // Ici vous pouvez ajouter la logique pour sauvegarder le message
     // ou l'envoyer par email
-    console.log('Message de contact reçu:', { name, email, subject, message });
 
     res.status(200).json({
       status: 'success',
       message: 'Message envoyé avec succès'
     });
   } catch (error) {
-    console.error('Erreur lors de l\'envoi du message:', error);
     res.status(500).json({
       status: 'error',
       message: 'Erreur interne du serveur'

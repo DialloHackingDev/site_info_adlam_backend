@@ -26,7 +26,6 @@ exports.getCart = async (req, res) => {
       try {
         await cart.cleanInvalidItems();
       } catch (cleanError) {
-        console.error('Erreur cleanInvalidItems:', cleanError);
         // Continuer même si le nettoyage échoue
       }
     }
@@ -41,7 +40,6 @@ exports.getCart = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Erreur lors de la récupération du panier:', error);
     res.status(500).json({
       status: 'error',
       message: 'Erreur lors de la récupération du panier',
@@ -122,7 +120,6 @@ exports.addToCart = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Erreur lors de l\'ajout au panier:', error);
     res.status(400).json({
       status: 'error',
       message: 'Erreur lors de l\'ajout au panier'
@@ -237,7 +234,6 @@ exports.getCartCount = async (req, res) => {
       data: { count }
     });
   } catch (error) {
-    console.error('Erreur lors de la récupération du nombre d\'items:', error);
     res.status(200).json({
       status: 'success',
       data: { count: 0 }

@@ -262,11 +262,9 @@ exports.getEbookBySlug = async (req, res) => {
 // Obtenir les e-books récents
 exports.getRecentEbooks = async (req, res) => {
   try {
-    console.log('🔍 getRecentEbooks appelé avec limit:', req.query.limit);
     const { limit = 8 } = req.query;
 
     const ebooks = await Ebook.getRecent(parseInt(limit));
-    console.log('📚 E-books récents trouvés:', ebooks.length);
 
     res.status(200).json({
       status: 'success',
@@ -274,7 +272,6 @@ exports.getRecentEbooks = async (req, res) => {
       data: { ebooks: ebooks.map(ebook => ebook.getPublicData()) }
     });
   } catch (error) {
-    console.error('❌ Erreur getRecentEbooks:', error);
     res.status(500).json({
       status: 'error',
       message: error.message
@@ -470,10 +467,8 @@ exports.deleteEbook = async (req, res) => {
 
     // Supprimer les fichiers de Cloudinary
     if (ebook.coverImagePublicId) {
-      await EbookFileService.deleteFile(ebook.coverImagePublicId).catch(console.error);
     }
     if (ebook.pdfFilePublicId) {
-      await EbookFileService.deleteFile(ebook.pdfFilePublicId, 'raw').catch(console.error);
     }
 
     await Ebook.findByIdAndDelete(id);
@@ -679,7 +674,6 @@ exports.streamPdf = async (req, res) => {
       fileStream.pipe(res);
     }
   } catch (error) {
-    console.error('Erreur streaming PDF:', error);
     res.status(500).json({
       status: 'error',
       message: 'Erreur lors du chargement du PDF'

@@ -33,7 +33,6 @@ exports.enable2FA = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Enable 2FA error:', error);
     res.status(500).json({
       status: 'error',
       message: 'Erreur lors de l\'activation du 2FA'
@@ -81,7 +80,6 @@ exports.verify2FA = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Verify 2FA error:', error);
     res.status(500).json({
       status: 'error',
       message: 'Erreur lors de la vérification'
@@ -122,7 +120,6 @@ exports.disable2FA = async (req, res) => {
       message: '2FA désactivé avec succès'
     });
   } catch (error) {
-    console.error('Disable 2FA error:', error);
     res.status(500).json({
       status: 'error',
       message: 'Erreur lors de la désactivation'
@@ -173,7 +170,6 @@ exports.verifyLogin2FA = async (req, res) => {
       message: 'Authentification réussie'
     });
   } catch (error) {
-    console.error('Verify login 2FA error:', error);
     res.status(500).json({
       status: 'error',
       message: 'Erreur lors de la vérification'

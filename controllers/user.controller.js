@@ -54,7 +54,6 @@ exports.register = async (req, res) => {
         message: "Cet email est déjà utilisé"
       });
     }
-    console.log(error)
     res.status(400).json({
       status: 'error',
       message: error.message || 'Erreur lors de la création du compte'
@@ -65,7 +64,6 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    console.log('Login attempt for:', email);
 
     // Validation des types pour prévenir l'injection NoSQL
     if (!email || !password || 
@@ -78,7 +76,6 @@ exports.login = async (req, res) => {
     }
 
     const user = await User.findOne({ email }).select('+password');
-    console.log('User found:', user ? 'Yes' : 'No');
     
     if (!user) {
       return res.status(401).json({
@@ -87,9 +84,7 @@ exports.login = async (req, res) => {
       });
     }
     
-    console.log('Comparing passwords...');
     const verifyPassword = await user.comparePassword(password);
-    console.log('Password valid:', verifyPassword);
     
     if (!verifyPassword) {
       return res.status(401).json({
@@ -99,7 +94,6 @@ exports.login = async (req, res) => {
     }
 
     const token = signToken(user._id);
-    console.log('Token generated:', token ? 'Yes' : 'No');
 
     const cookieOptions = {
       expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 jours
@@ -109,7 +103,6 @@ exports.login = async (req, res) => {
     };
 
     res.cookie('jwt', token, cookieOptions);
-    console.log('About to send response...');
 
     res.status(200).json({
       status: 'success',
@@ -123,9 +116,7 @@ exports.login = async (req, res) => {
         }
       }
     });
-    console.log('Response sent successfully');
   } catch (error) {
-    console.error('Login error details:', error);
     res.status(500).json({
       status: 'error',
       message: 'Erreur serveur lors de la connexion'
@@ -156,6 +147,5 @@ exports.getMe = async (req, res) => {
       status: 'error',
       message: 'Erreur serveur lors de la récupération du profil'
     });
-    console.log(error)
   }
 };
