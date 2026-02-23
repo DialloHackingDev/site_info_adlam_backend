@@ -77,9 +77,9 @@ const ebookPdfStorage = new CloudinaryStorage({
   }
 });
 
-// Middleware multer pour l'upload d'images d'articles (stockage local)
+// Middleware multer pour l'upload d'images d'articles (Cloudinary)
 const uploadArticleImage = multer({
-  storage: localStorage,
+  storage: articleImageStorage,
   limits: {
     fileSize: 5 * 1024 * 1024 // 5MB max
   },
