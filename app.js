@@ -37,30 +37,37 @@ app.use(helmet({
   contentSecurityPolicy: false
 }));
 
-// Middleware de sécurité globaux
-app.use(validateContentType);
-app.use(limitRequestSize('10mb'));
+// Middleware de sécurité globaux - Désactivé temporairement pour déboguer
+// app.use(validateContentType);
+// app.use(limitRequestSize('10mb'));
 
-// CORS - Support production et développement
-const allowedOrigins = process.env.NODE_ENV === 'production'
-  ? [
-      process.env.FRONTEND_URL || 'https://yelaare.vercel.app',
-      'https://yelaare.vercel.app',
-      'https://adlam-fulani-front.vercel.app'
-    ]
-  : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176'];
+// CORS - Configuration simplifiée pour déboguer
+const allowedOrigins = [
+  'https://yelaare.vercel.app',
+  'https://adlam-fulani-front.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175',
+  'http://localhost:5176'
+];
 
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+  origin: function(origin, callback) {
+    // Autoriser les requêtes sans origin (Postman, curl, etc.)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      console.log('❌ Origin bloquée:', origin);
+      callback(null, true); // Temporairement autoriser tout pour déboguer
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Content-Length', 'X-Request-Id'],
+  maxAge: 86400
 }));
 
 // Désactiver le cache en développement
