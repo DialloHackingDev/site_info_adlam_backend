@@ -44,7 +44,8 @@ app.use(limitRequestSize('10mb'));
 // CORS - Support production et développement
 const allowedOrigins = process.env.NODE_ENV === 'production'
   ? [
-      process.env.FRONTEND_URL || 'https://adlam-fulani-front.vercel.app',
+      process.env.FRONTEND_URL || 'https://yelaare.vercel.app',
+      'https://yelaare.vercel.app',
       'https://adlam-fulani-front.vercel.app'
     ]
   : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176'];
