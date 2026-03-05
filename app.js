@@ -37,8 +37,7 @@ app.use(helmet({
   contentSecurityPolicy: false
 }));
 
-// Middleware de sécurité globaux
-app.use(validateContentType);
+// Middleware de limitation de taille AVANT le parsing
 app.use(limitRequestSize('10mb'));
 
 // CORS - Configuration simplifiée pour déboguer
@@ -86,6 +85,9 @@ app.use(express.json({ limit: '10mb', charset: 'utf-8' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb', charset: 'utf-8' }));
 app.use(morgan("dev"));
 app.use(cookieParser());
+
+// Middleware de validation Content-Type APRÈS le parsing
+app.use(validateContentType);
 
 // Servir les fichiers statiques du dossier uploads
 app.use('/uploads', express.static('uploads', {

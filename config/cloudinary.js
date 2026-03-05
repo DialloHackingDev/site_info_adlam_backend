@@ -77,6 +77,29 @@ const ebookPdfStorage = new CloudinaryStorage({
   }
 });
 
+// Configuration du stockage pour les documents (PDFs, DOCs, etc.)
+const documentFileStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'adlam/documents',
+    allowed_formats: ['pdf', 'doc', 'docx', 'txt', 'odt'],
+    resource_type: 'raw'
+  }
+});
+
+// Configuration du stockage pour les miniatures de documents
+const documentThumbnailStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'adlam/documents/thumbnails',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+    transformation: [
+      { width: 300, height: 400, crop: 'fill', quality: 'auto' },
+      { format: 'webp' }
+    ]
+  }
+});
+
 // Middleware multer pour l'upload d'images d'articles (Cloudinary)
 const uploadArticleImage = multer({
   storage: articleImageStorage,
@@ -118,6 +141,43 @@ const uploadEbookPdf = multer({
       cb(null, true);
     } else {
       cb(new Error('Seuls les fichiers PDF sont autorisés'), false);
+    }
+  }
+});
+
+// Middleware multer pour l'upload de fichiers documents
+const uploadDocumentFile = multer({
+  storage: documentFileStorage,
+  limits: {
+    fileSize: 20 * 1024 * 1024 // 20MB max
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedMimes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain',
+      'application/vnd.oasis.opendocument.text'
+    ];
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Format de fichier non autorisé'), false);
+    }
+  }
+});
+
+// Middleware multer pour l'upload de miniature de document
+const uploadDocumentThumbnail = multer({
+  storage: documentThumbnailStorage,
+  limits: {
+    fileSize: 3 * 1024 * 1024 // 3MB max
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Seules les images sont autorisées pour la miniature'), false);
     }
   }
 });
@@ -171,6 +231,8 @@ module.exports = {
   uploadEbookCover,
   uploadEbookPdf,
   uploadEbookFiles,
+  uploadDocumentFile,
+  uploadDocumentThumbnail,
   deleteImage,
   extractPublicId
 };

@@ -34,7 +34,9 @@ const {
   uploadOptionalImage,
   validateImageDimensions,
   uploadEbookFiles,
-  uploadOptionalEbookFiles
+  uploadOptionalEbookFiles,
+  uploadDocumentFiles,
+  uploadOptionalDocumentFiles
 } = require('./upload');
 
 // Sessions anonymes
@@ -82,6 +84,8 @@ module.exports = {
   validateImageDimensions,
   uploadEbookFiles,
   uploadOptionalEbookFiles,
+  uploadDocumentFiles,
+  uploadOptionalDocumentFiles,
   
   // Sessions anonymes
   anonymousSession

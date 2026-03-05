@@ -41,6 +41,7 @@ router.get('/stats', adminOnly, articleController.getArticleStats);
 router.get('/:id', adminOnly, articleController.getArticleById);
 router.patch('/:id', adminOnly, uploadOptionalImage, validateArticleUpdate, articleController.updateArticle);
 router.patch('/:id/featured', adminOnly, articleController.toggleFeatured);
+router.patch('/:id/published', adminOnly, articleController.togglePublished);
 router.patch('/:id/schedule', adminOnly, articleController.scheduleArticle);
 router.patch('/:id/unschedule', adminOnly, articleController.unscheduleArticle);
 router.delete('/:id', adminOnly, articleController.deleteArticle);

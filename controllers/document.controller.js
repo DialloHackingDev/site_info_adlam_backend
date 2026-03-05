@@ -22,22 +22,12 @@ exports.createDocument = async (req, res) => {
     } = req.body;
 
     // Vérifier que le fichier principal est présent
-    if (!req.files || !req.files.file) {
+    if (!req.uploadedFile) {
       return res.status(400).json({
         status: 'error',
         message: 'Fichier principal obligatoire'
       });
     }
-
-    const file = req.files.file;
-    
-    // Upload du fichier principal
-    const fileResult = await cloudinary.uploader.upload(file.tempFilePath, {
-      folder: 'adlam/documents',
-      resource_type: 'auto',
-      use_filename: true,
-      unique_filename: true
-    });
 
     const documentData = {
       title,
@@ -55,22 +45,18 @@ exports.createDocument = async (req, res) => {
       keywords: Array.isArray(keywords) ? keywords : (keywords ? keywords.split(',').map(k => k.trim()) : []),
       featured: featured || false,
       createdBy: req.user._id,
-      // Fichier principal
-      fileUrl: fileResult.secure_url,
-      filePublicId: fileResult.public_id,
-      fileName: file.name,
-      fileSize: fileResult.bytes,
-      mimeType: file.mimetype
+      // Fichier principal (depuis multer + Cloudinary)
+      fileUrl: req.uploadedFile.url,
+      filePublicId: req.uploadedFile.publicId,
+      fileName: req.uploadedFile.originalname,
+      fileSize: req.uploadedFile.size,
+      mimeType: req.uploadedFile.mimetype
     };
 
-    // Upload de la miniature si fournie
-    if (req.files && req.files.thumbnail) {
-      const thumbnailResult = await cloudinary.uploader.upload(req.files.thumbnail.tempFilePath, {
-        folder: 'adlam/documents/thumbnails',
-        resource_type: 'image'
-      });
-      documentData.thumbnailUrl = thumbnailResult.secure_url;
-      documentData.thumbnailPublicId = thumbnailResult.public_id;
+    // Miniature optionnelle (depuis multer + Cloudinary)
+    if (req.uploadedThumbnail) {
+      documentData.thumbnailUrl = req.uploadedThumbnail.url;
+      documentData.thumbnailPublicId = req.uploadedThumbnail.publicId;
     }
 
     const document = await Document.create(documentData);
@@ -81,6 +67,22 @@ exports.createDocument = async (req, res) => {
       data: { document: document.getPublicData() }
     });
   } catch (error) {
+    // Supprimer les fichiers uploadés en cas d'erreur
+    if (req.uploadedFile?.publicId) {
+      try {
+        await cloudinary.cloudinary.uploader.destroy(req.uploadedFile.publicId, { resource_type: 'raw' });
+      } catch (deleteError) {
+        console.error('Erreur suppression fichier:', deleteError);
+      }
+    }
+    if (req.uploadedThumbnail?.publicId) {
+      try {
+        await cloudinary.cloudinary.uploader.destroy(req.uploadedThumbnail.publicId);
+      } catch (deleteError) {
+        console.error('Erreur suppression miniature:', deleteError);
+      }
+    }
+    
     res.status(400).json({
       status: 'error',
       message: error.message
@@ -370,44 +372,37 @@ exports.updateDocument = async (req, res) => {
       });
     }
 
-    // Traiter les nouveaux fichiers si fournis
-    if (req.files) {
-      if (req.files.file) {
-        // Supprimer l'ancien fichier
-        if (document.filePublicId) {
-          await cloudinary.uploader.destroy(document.filePublicId, { resource_type: 'auto' });
+    // Traiter le nouveau fichier si fourni (depuis multer + Cloudinary)
+    if (req.uploadedFile) {
+      // Supprimer l'ancien fichier
+      if (document.filePublicId) {
+        try {
+          await cloudinary.cloudinary.uploader.destroy(document.filePublicId, { resource_type: 'raw' });
+        } catch (deleteError) {
+          console.error('Erreur suppression ancien fichier:', deleteError);
         }
-
-        // Upload du nouveau fichier
-        const fileResult = await cloudinary.uploader.upload(req.files.file.tempFilePath, {
-          folder: 'adlam/documents',
-          resource_type: 'auto',
-          use_filename: true,
-          unique_filename: true
-        });
-
-        updates.fileUrl = fileResult.secure_url;
-        updates.filePublicId = fileResult.public_id;
-        updates.fileName = req.files.file.name;
-        updates.fileSize = fileResult.bytes;
-        updates.mimeType = req.files.file.mimetype;
       }
 
-      if (req.files.thumbnail) {
-        // Supprimer l'ancienne miniature
-        if (document.thumbnailPublicId) {
-          await cloudinary.uploader.destroy(document.thumbnailPublicId);
+      updates.fileUrl = req.uploadedFile.url;
+      updates.filePublicId = req.uploadedFile.publicId;
+      updates.fileName = req.uploadedFile.originalname;
+      updates.fileSize = req.uploadedFile.size;
+      updates.mimeType = req.uploadedFile.mimetype;
+    }
+
+    // Traiter la nouvelle miniature si fournie (depuis multer + Cloudinary)
+    if (req.uploadedThumbnail) {
+      // Supprimer l'ancienne miniature
+      if (document.thumbnailPublicId) {
+        try {
+          await cloudinary.cloudinary.uploader.destroy(document.thumbnailPublicId);
+        } catch (deleteError) {
+          console.error('Erreur suppression ancienne miniature:', deleteError);
         }
-
-        // Upload de la nouvelle miniature
-        const thumbnailResult = await cloudinary.uploader.upload(req.files.thumbnail.tempFilePath, {
-          folder: 'adlam/documents/thumbnails',
-          resource_type: 'image'
-        });
-
-        updates.thumbnailUrl = thumbnailResult.secure_url;
-        updates.thumbnailPublicId = thumbnailResult.public_id;
       }
+
+      updates.thumbnailUrl = req.uploadedThumbnail.url;
+      updates.thumbnailPublicId = req.uploadedThumbnail.publicId;
     }
 
     // Traiter les tags et keywords
@@ -452,10 +447,18 @@ exports.deleteDocument = async (req, res) => {
 
     // Supprimer les fichiers de Cloudinary
     if (document.filePublicId) {
-      await cloudinary.uploader.destroy(document.filePublicId, { resource_type: 'auto' });
+      try {
+        await cloudinary.cloudinary.uploader.destroy(document.filePublicId, { resource_type: 'raw' });
+      } catch (deleteError) {
+        console.error('Erreur suppression fichier:', deleteError);
+      }
     }
     if (document.thumbnailPublicId) {
-      await cloudinary.uploader.destroy(document.thumbnailPublicId);
+      try {
+        await cloudinary.cloudinary.uploader.destroy(document.thumbnailPublicId);
+      } catch (deleteError) {
+        console.error('Erreur suppression miniature:', deleteError);
+      }
     }
 
     await Document.findByIdAndDelete(id);

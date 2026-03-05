@@ -7,21 +7,27 @@ exports.validateContentType = (req, res, next) => {
     return next();
   }
   
+  // Ignorer la validation pour les requêtes GET et DELETE
+  if (['GET', 'DELETE'].includes(req.method)) {
+    return next();
+  }
+  
   // Ignorer la validation pour les uploads de fichiers (multipart/form-data)
   if (req.is('multipart/form-data')) {
     return next();
   }
   
-  // Ignorer la validation pour les requêtes sans body (GET, DELETE, ou requêtes sans Content-Length)
+  // Ignorer la validation pour les requêtes sans body
   const contentLength = req.get('content-length');
   if (!contentLength || contentLength === '0') {
     return next();
   }
   
-  if (['POST', 'PUT', 'PATCH'].includes(req.method) && !req.is('application/json')) {
+  // Valider uniquement pour POST, PUT, PATCH avec body JSON
+  if (['POST', 'PUT', 'PATCH'].includes(req.method) && !req.is('application/json') && !req.is('application/x-www-form-urlencoded')) {
     return res.status(400).json({
       status: 'error',
-      message: 'Content-Type doit être application/json'
+      message: 'Content-Type doit être application/json ou application/x-www-form-urlencoded'
     });
   }
   next();

@@ -122,3 +122,101 @@ exports.uploadOptionalImage = (req, res, next) => {
     next();
   });
 };
+
+/**
+ * Middleware pour l'upload de fichiers documents (fichier + miniature optionnelle)
+ */
+exports.uploadDocumentFiles = (req, res, next) => {
+  const { uploadDocumentFile, uploadDocumentThumbnail } = require('../config/cloudinary');
+  const upload = require('multer')().fields([
+    { name: 'file', maxCount: 1 },
+    { name: 'thumbnail', maxCount: 1 }
+  ]);
+  
+  // Utiliser multer avec CloudinaryStorage
+  const uploadFile = uploadDocumentFile.single('file');
+  const uploadThumb = uploadDocumentThumbnail.single('thumbnail');
+  
+  // Upload fichier principal
+  uploadFile(req, res, (error) => {
+    if (error) {
+      if (error.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Fichier trop volumineux. Taille maximum: 20MB'
+        });
+      }
+      return res.status(400).json({
+        status: 'error',
+        message: 'Erreur lors de l\'upload du fichier: ' + error.message
+      });
+    }
+    
+    if (req.file) {
+      req.uploadedFile = {
+        url: req.file.path,
+        publicId: req.file.filename,
+        size: req.file.size,
+        mimetype: req.file.mimetype,
+        originalname: req.file.originalname
+      };
+    }
+    
+    // Upload miniature (optionnel)
+    uploadThumb(req, res, (thumbError) => {
+      if (thumbError) {
+        console.warn('Erreur upload miniature:', thumbError.message);
+      }
+      
+      if (req.file && req.file.fieldname === 'thumbnail') {
+        req.uploadedThumbnail = {
+          url: req.file.path,
+          publicId: req.file.filename
+        };
+      }
+      
+      next();
+    });
+  });
+};
+
+/**
+ * Middleware pour l'upload optionnel de fichiers documents (mise à jour)
+ */
+exports.uploadOptionalDocumentFiles = (req, res, next) => {
+  const { uploadDocumentFile, uploadDocumentThumbnail } = require('../config/cloudinary');
+  
+  const uploadFile = uploadDocumentFile.single('file');
+  const uploadThumb = uploadDocumentThumbnail.single('thumbnail');
+  
+  uploadFile(req, res, (error) => {
+    if (error) {
+      console.warn('Erreur upload fichier optionnel:', error.message);
+    }
+    
+    if (req.file) {
+      req.uploadedFile = {
+        url: req.file.path,
+        publicId: req.file.filename,
+        size: req.file.size,
+        mimetype: req.file.mimetype,
+        originalname: req.file.originalname
+      };
+    }
+    
+    uploadThumb(req, res, (thumbError) => {
+      if (thumbError) {
+        console.warn('Erreur upload miniature optionnelle:', thumbError.message);
+      }
+      
+      if (req.file && req.file.fieldname === 'thumbnail') {
+        req.uploadedThumbnail = {
+          url: req.file.path,
+          publicId: req.file.filename
+        };
+      }
+      
+      next();
+    });
+  });
+};

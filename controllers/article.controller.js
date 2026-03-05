@@ -63,6 +63,11 @@ exports.createArticle = async (req, res) => {
   } catch (error) {
     // Supprimer l'image uploadée en cas d'erreur
     if (req.uploadedImagePublicId) {
+      try {
+        await deleteImage(req.uploadedImagePublicId);
+      } catch (deleteError) {
+        console.error('Erreur suppression image:', deleteError);
+      }
     }
     
     if (error.code === 11000) {
@@ -264,6 +269,11 @@ exports.updateArticle = async (req, res) => {
         
         // Supprimer l'ancienne image
         if (oldImagePublicId) {
+          try {
+            await deleteImage(oldImagePublicId);
+          } catch (deleteError) {
+            console.error('Erreur suppression ancienne image:', deleteError);
+          }
         }
       }
     }
@@ -321,6 +331,11 @@ exports.deleteArticle = async (req, res) => {
 
     // Supprimer l'image de couverture si elle existe
     if (article.coverImagePublicId) {
+      try {
+        await deleteImage(article.coverImagePublicId);
+      } catch (deleteError) {
+        console.error('Erreur suppression image:', deleteError);
+      }
     }
 
     await Article.findByIdAndDelete(id);
@@ -575,6 +590,45 @@ exports.getArticleStats = async (req, res) => {
         },
         categoryStats,
         scheduledStats: scheduledStats[0] || { total: 0, nextScheduled: null }
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+};
+
+// Basculer le statut published/draft d'un article
+exports.togglePublished = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const article = await Article.findById(id);
+
+    if (!article) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Article non trouvé'
+      });
+    }
+
+    // Basculer entre published et draft
+    const newStatus = article.status === 'published' ? 'draft' : 'published';
+    article.status = newStatus;
+    
+    // Définir publishedAt si on publie
+    if (newStatus === 'published' && !article.publishedAt) {
+      article.publishedAt = new Date();
+    }
+    
+    await article.save();
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        article,
+        message: `Article ${newStatus === 'published' ? 'publié' : 'mis en brouillon'} avec succès`
       }
     });
   } catch (error) {

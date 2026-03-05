@@ -105,12 +105,24 @@ class EbookFileService {
    */
   static async deleteFile(publicId, resourceType = 'image') {
     try {
+      if (!publicId) {
+        console.warn('Aucun publicId fourni pour la suppression');
+        return null;
+      }
+      
       const result = await cloudinary.uploader.destroy(publicId, {
         resource_type: resourceType
       });
+      
+      if (result.result === 'ok') {
+        console.log(`Fichier ${publicId} supprimé avec succès`);
+      } else {
+        console.warn(`Suppression fichier ${publicId}: ${result.result}`);
+      }
+      
       return result;
     } catch (error) {
-      console.error(`Erreur suppression fichier ${publicId}:`, error);
+      console.error(`Erreur suppression fichier ${publicId}:`, error.message);
       throw error;
     }
   }

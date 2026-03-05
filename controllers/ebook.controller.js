@@ -467,8 +467,18 @@ exports.deleteEbook = async (req, res) => {
 
     // Supprimer les fichiers de Cloudinary
     if (ebook.coverImagePublicId) {
+      try {
+        await EbookFileService.deleteFile(ebook.coverImagePublicId);
+      } catch (deleteError) {
+        console.error('Erreur suppression couverture:', deleteError);
+      }
     }
     if (ebook.pdfFilePublicId) {
+      try {
+        await EbookFileService.deleteFile(ebook.pdfFilePublicId, 'raw');
+      } catch (deleteError) {
+        console.error('Erreur suppression PDF:', deleteError);
+      }
     }
 
     await Ebook.findByIdAndDelete(id);

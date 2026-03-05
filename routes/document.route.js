@@ -1,6 +1,14 @@
 const express = require('express');
 const documentController = require('../controllers/document.controller');
-const { protect, adminOnly, optionalAuth, validateInput, sanitizeInput } = require('../middlewares');
+const { 
+  protect, 
+  adminOnly, 
+  optionalAuth, 
+  validateInput, 
+  sanitizeInput,
+  uploadDocumentFiles,
+  uploadOptionalDocumentFiles
+} = require('../middlewares');
 
 const router = express.Router();
 
@@ -21,8 +29,8 @@ router.get('/:id/download', optionalAuth, documentController.downloadDocument);
 router.use(protect);
 router.use(adminOnly);
 
-router.post('/', documentController.createDocument);
-router.put('/:id', documentController.updateDocument);
+router.post('/', uploadDocumentFiles, documentController.createDocument);
+router.put('/:id', uploadOptionalDocumentFiles, documentController.updateDocument);
 router.delete('/:id', documentController.deleteDocument);
 router.patch('/:id/featured', documentController.toggleFeatured);
 router.get('/admin/stats', documentController.getDocumentStats);
