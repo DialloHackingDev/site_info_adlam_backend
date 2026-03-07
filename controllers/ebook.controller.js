@@ -626,6 +626,15 @@ exports.streamPdf = async (req, res) => {
       });
     }
 
+    // Vérifier que le fichier PDF existe
+    if (!ebook.pdfFile) {
+      console.error('❌ Ebook sans fichier PDF:', id);
+      return res.status(404).json({
+        status: 'error',
+        message: 'Fichier PDF non disponible'
+      });
+    }
+
     // Vérifier que l'utilisateur a acheté l'e-book OU que c'est gratuit
     if (ebook.price > 0) {
       const order = await Order.findOne({
@@ -645,13 +654,16 @@ exports.streamPdf = async (req, res) => {
     // Vérifier si le fichier est sur Cloudinary ou local
     if (ebook.pdfFile.includes('cloudinary.com')) {
       // Fichier sur Cloudinary - streamer depuis Cloudinary
+      console.log('📄 Streaming PDF depuis Cloudinary:', ebook.pdfFile);
+      
       const response = await axios.get(ebook.pdfFile, {
         responseType: 'arraybuffer',
         headers: {
           'Accept': 'application/pdf',
           'Accept-Encoding': 'identity'
         },
-        decompress: false
+        decompress: false,
+        timeout: 30000
       });
 
       res.setHeader('Content-Type', 'application/pdf');
@@ -684,9 +696,11 @@ exports.streamPdf = async (req, res) => {
       fileStream.pipe(res);
     }
   } catch (error) {
+    console.error('❌ Erreur streaming PDF:', error.message);
+    console.error('Stack:', error.stack);
     res.status(500).json({
       status: 'error',
-      message: 'Erreur lors du chargement du PDF'
+      message: 'Erreur lors du chargement du PDF: ' + error.message
     });
   }
 };
