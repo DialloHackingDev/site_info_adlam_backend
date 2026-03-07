@@ -404,26 +404,38 @@ exports.updateEbook = async (req, res) => {
         await cloudinary.uploader.destroy(ebook.coverImagePublicId);
       }
 
-      const coverResult = await cloudinary.uploader.upload(req.files.coverImage[0].path, {
-        folder: 'adlam/ebooks/covers',
-        resource_type: 'image'
+      const coverResult = await new Promise((resolve, reject) => {
+        cloudinary.uploader.upload_stream({
+          folder: 'adlam/ebooks/covers',
+          resource_type: 'image'
+        }, (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }).end(req.files.coverImage[0].buffer);
       });
+      
       updateData.coverImage = coverResult.secure_url;
       updateData.coverImagePublicId = coverResult.public_id;
     }
 
     // Upload nouveau fichier PDF
     if (req.files?.pdfFile) {
-      if (ebook.filePublicId) {
-        await cloudinary.uploader.destroy(ebook.filePublicId);
+      if (ebook.pdfFilePublicId) {
+        await cloudinary.uploader.destroy(ebook.pdfFilePublicId, { resource_type: 'raw' });
       }
 
-      const pdfResult = await cloudinary.uploader.upload(req.files.pdfFile[0].path, {
-        folder: 'adlam/ebooks/files',
-        resource_type: 'raw'
+      const pdfResult = await new Promise((resolve, reject) => {
+        cloudinary.uploader.upload_stream({
+          folder: 'adlam/ebooks/pdfs',
+          resource_type: 'raw'
+        }, (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }).end(req.files.pdfFile[0].buffer);
       });
-      updateData.fileUrl = pdfResult.secure_url;
-      updateData.filePublicId = pdfResult.public_id;
+      
+      updateData.pdfFile = pdfResult.secure_url;
+      updateData.pdfFilePublicId = pdfResult.public_id;
     }
 
     const updatedEbook = await Ebook.findByIdAndUpdate(
