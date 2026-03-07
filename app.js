@@ -21,6 +21,7 @@ const cartRouter = require('./routes/cart.route');
 const checkoutRouter = require('./routes/checkout.route');
 const shopRouter = require('./routes/shop.route');
 const adminRouter = require('./routes/admin.route');
+const adminUserRouter = require('./routes/admin.user.route');
 const documentRouter = require('./routes/document.route');
 const contactRouter = require('./routes/contact.route');
 
@@ -50,7 +51,7 @@ const allowedOrigins = [
   'http://localhost:5176'
 ];
 
-app.use(cors({
+const corsOptions = {
   origin: function(origin, callback) {
     // Autoriser les requêtes sans origin (Postman, curl, etc.)
     if (!origin) return callback(null, true);
@@ -66,8 +67,11 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   exposedHeaders: ['Content-Length', 'X-Request-Id'],
-  maxAge: 86400
-}));
+  maxAge: 86400,
+  optionsSuccessStatus: 204
+};
+
+app.use(cors(corsOptions));
 
 // Désactiver le cache en développement
 if (process.env.NODE_ENV !== 'production') {
@@ -116,6 +120,7 @@ app.use('/api/v1/cart', cartRouter);
 app.use('/api/v1/checkout', checkoutRouter);
 app.use('/api/v1/shop', shopRouter);
 app.use('/api/v1/admin', adminRouter);
+app.use('/api/v1/admin', adminUserRouter);
 app.use('/api/v1/documents', documentRouter);
 app.use('/api/v1/contact', contactRouter);
 

@@ -15,16 +15,16 @@ class SchedulerService {
   start() {
     if (this.isRunning) return;
 
-    // Vérifier toutes les minutes si des articles doivent être publiés
-    this.cronJob = cron.schedule('* * * * *', async () => {
+    // Vérifier toutes les 5 minutes (au lieu de chaque minute)
+    this.cronJob = cron.schedule('*/5 * * * *', async () => {
       await this.publishScheduledArticles();
     }, {
-      scheduled: false
+      scheduled: true,
+      timezone: 'UTC'
     });
 
-    this.cronJob.start();
     this.isRunning = true;
-    console.log('📅 Scheduler des articles planifiés démarré');
+    console.log('📅 Scheduler des articles planifiés démarré (toutes les 5 min)');
   }
 
   /**

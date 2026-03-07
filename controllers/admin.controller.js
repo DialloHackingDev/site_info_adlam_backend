@@ -44,26 +44,21 @@ exports.createArticle = async (req, res) => {
 
     const articleData = { ...req.body, author: req.user._id };
 
-    // Upload de l'image de couverture si fournie
+    // Upload de l'image de couverture sur Cloudinary
     if (req.file) {
       try {
+        const result = await new Promise((resolve, reject) => {
+          cloudinary.uploader.upload_stream({
+            folder: 'adlam/articles',
+            resource_type: 'image'
+          }, (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }).end(req.file.buffer);
+        });
         
-        const fs = require('fs');
-        const path = require('path');
-        const uploadDir = path.join(__dirname, '../uploads');
-        
-        // Créer le dossier uploads s'il n'existe pas
-        if (!fs.existsSync(uploadDir)) {
-          fs.mkdirSync(uploadDir, { recursive: true });
-        }
-        
-        const filename = `article-${Date.now()}-${req.file.originalname}`;
-        const filepath = path.join(uploadDir, filename);
-        
-        fs.writeFileSync(filepath, req.file.buffer);
-        
-        articleData.coverImage = `http://localhost:5000/uploads/${filename}`;
-        articleData.coverImagePublicId = filename;
+        articleData.coverImage = result.secure_url;
+        articleData.coverImagePublicId = result.public_id;
       } catch (uploadError) {
         return res.status(400).json({
           status: 'error',
@@ -219,20 +214,9 @@ exports.deleteArticle = async (req, res) => {
     // Supprimer l'image de Cloudinary si elle existe
     if (article.coverImagePublicId && article.coverImagePublicId !== 'placeholder') {
       try {
-        // Vérifier si c'est une image locale ou Cloudinary
-        if (!article.coverImagePublicId.startsWith('article-') && !article.coverImagePublicId.startsWith('cover-')) {
-          await cloudinary.uploader.destroy(article.coverImagePublicId);
-        } else {
-          // Supprimer le fichier local
-          const fs = require('fs');
-          const path = require('path');
-          const filepath = path.join(__dirname, '../uploads', article.coverImagePublicId);
-          if (fs.existsSync(filepath)) {
-            fs.unlinkSync(filepath);
-          }
-        }
+        await cloudinary.uploader.destroy(article.coverImagePublicId);
       } catch (deleteError) {
-        // Continuer même si la suppression de l'image échoue
+        console.warn('Erreur suppression image:', deleteError.message);
       }
     }
 
@@ -317,48 +301,41 @@ exports.createEbook = async (req, res) => {
       }
     }
     
-    // Traiter les fichiers uploadés
+    // Traiter les fichiers uploadés sur Cloudinary
     if (req.files) {
       try {
-        
-        // Upload image de couverture localement
+        // Upload image de couverture sur Cloudinary
         if (req.files.coverImage && req.files.coverImage[0]) {
           const coverFile = req.files.coverImage[0];
-          const fs = require('fs');
-          const path = require('path');
-          const uploadDir = path.join(__dirname, '../uploads');
+          const coverResult = await new Promise((resolve, reject) => {
+            cloudinary.uploader.upload_stream({
+              folder: 'adlam/ebooks/covers',
+              resource_type: 'image'
+            }, (error, result) => {
+              if (error) reject(error);
+              else resolve(result);
+            }).end(coverFile.buffer);
+          });
           
-          if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-          }
-          
-          const filename = `cover-${Date.now()}-${coverFile.originalname}`;
-          const filepath = path.join(uploadDir, filename);
-          
-          fs.writeFileSync(filepath, coverFile.buffer);
-          
-          ebookData.coverImage = `/uploads/${filename}`;
-          ebookData.coverImagePublicId = filename;
+          ebookData.coverImage = coverResult.secure_url;
+          ebookData.coverImagePublicId = coverResult.public_id;
         }
         
-        // Upload fichier PDF localement
+        // Upload fichier PDF sur Cloudinary
         if (req.files.pdfFile && req.files.pdfFile[0]) {
           const pdfFile = req.files.pdfFile[0];
-          const fs = require('fs');
-          const path = require('path');
-          const uploadDir = path.join(__dirname, '../uploads');
+          const pdfResult = await new Promise((resolve, reject) => {
+            cloudinary.uploader.upload_stream({
+              folder: 'adlam/ebooks/pdfs',
+              resource_type: 'raw'
+            }, (error, result) => {
+              if (error) reject(error);
+              else resolve(result);
+            }).end(pdfFile.buffer);
+          });
           
-          if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-          }
-          
-          const filename = `pdf-${Date.now()}-${pdfFile.originalname}`;
-          const filepath = path.join(uploadDir, filename);
-          
-          fs.writeFileSync(filepath, pdfFile.buffer);
-          
-          ebookData.pdfFile = `/uploads/${filename}`;
-          ebookData.pdfFilePublicId = filename;
+          ebookData.pdfFile = pdfResult.secure_url;
+          ebookData.pdfFilePublicId = pdfResult.public_id;
           ebookData.fileSize = pdfFile.size;
         }
         
@@ -479,36 +456,20 @@ exports.deleteEbook = async (req, res) => {
       });
     }
 
-    // Supprimer les fichiers de Cloudinary ou locaux
+    // Supprimer les fichiers de Cloudinary
     if (ebook.coverImagePublicId && ebook.coverImagePublicId !== 'placeholder') {
       try {
-        if (!ebook.coverImagePublicId.startsWith('cover-')) {
-          await cloudinary.uploader.destroy(ebook.coverImagePublicId);
-        } else {
-          const fs = require('fs');
-          const path = require('path');
-          const filepath = path.join(__dirname, '../uploads', ebook.coverImagePublicId);
-          if (fs.existsSync(filepath)) {
-            fs.unlinkSync(filepath);
-          }
-        }
+        await cloudinary.uploader.destroy(ebook.coverImagePublicId);
       } catch (deleteError) {
+        console.warn('Erreur suppression couverture:', deleteError.message);
       }
     }
     
     if (ebook.pdfFilePublicId && ebook.pdfFilePublicId !== 'placeholder') {
       try {
-        if (!ebook.pdfFilePublicId.startsWith('pdf-')) {
-          await cloudinary.uploader.destroy(ebook.pdfFilePublicId, { resource_type: 'raw' });
-        } else {
-          const fs = require('fs');
-          const path = require('path');
-          const filepath = path.join(__dirname, '../uploads', ebook.pdfFilePublicId);
-          if (fs.existsSync(filepath)) {
-            fs.unlinkSync(filepath);
-          }
-        }
+        await cloudinary.uploader.destroy(ebook.pdfFilePublicId, { resource_type: 'raw' });
       } catch (deleteError) {
+        console.warn('Erreur suppression PDF:', deleteError.message);
       }
     }
 

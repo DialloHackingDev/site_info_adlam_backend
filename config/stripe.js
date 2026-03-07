@@ -1,8 +1,10 @@
 const Stripe = require('stripe');
 
 // Vérifier que la clé Stripe est configurée
-if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_your_stripe_secret_key') {
-  console.warn('⚠️  STRIPE_SECRET_KEY non configurée - fonctionnalités de paiement désactivées');
+if (!process.env.STRIPE_SECRET_KEY || 
+    process.env.STRIPE_SECRET_KEY === 'sk_test_your_stripe_secret_key' ||
+    process.env.STRIPE_SECRET_KEY === 'sk_test_simulation_mode') {
+  console.log('🟡 MODE SIMULATION - Paiements simulés (pas de Stripe réel)');
   
   // Exporter un service mock pour le développement
   module.exports = {
