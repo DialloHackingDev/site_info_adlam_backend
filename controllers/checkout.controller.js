@@ -345,6 +345,16 @@ exports.downloadEbook = async (req, res) => {
 // Obtenir les e-books achetés par l'utilisateur
 exports.getPurchasedEbooks = async (req, res) => {
   try {
+    // Un administrateur a accès à tout le catalogue pour le relire
+    if (req.user.role === 'admin') {
+      const all = await Ebook.find({ status: 'published' }).sort({ createdAt: -1 });
+      return res.status(200).json({
+        status: 'success',
+        results: all.length,
+        data: { ebooks: all.map(e => ({ ...e.getPublicData(), adminAccess: true })) }
+      });
+    }
+
     const orders = await Order.find({
       user: req.user._id,
       status: 'completed'

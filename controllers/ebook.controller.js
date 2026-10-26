@@ -577,8 +577,8 @@ exports.generateDownloadUrl = async (req, res) => {
       });
     }
 
-    // Vérifier que l'utilisateur a acheté l'e-book OU que c'est gratuit
-    if (ebook.price > 0) {
+    // Accès : livre gratuit, administrateur, ou achat confirmé
+    if (ebook.price > 0 && req.user.role !== 'admin') {
       const order = await Order.findOne({
         user: req.user._id,
         'items.ebook': id,
@@ -638,8 +638,8 @@ exports.streamPdf = async (req, res) => {
       });
     }
 
-    // Vérifier que l'utilisateur a acheté l'e-book OU que c'est gratuit
-    if (ebook.price > 0) {
+    // Accès : livre gratuit, administrateur, ou achat confirmé
+    if (ebook.price > 0 && req.user.role !== 'admin') {
       const order = await Order.findOne({
         user: req.user._id,
         'items.ebook': id,

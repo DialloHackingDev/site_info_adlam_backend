@@ -58,3 +58,7 @@ ehthumbs.db
 # Node
 npm-debug.log
 yarn-error.log
+
+# Fichiers créés en local par le stockage de développement (services/storage.service.js)
+uploads/cover-*-*.*
+uploads/pdf-*-*.*

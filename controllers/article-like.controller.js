@@ -38,6 +38,8 @@ exports.toggleArticleLike = async (req, res) => {
     const likesCount = userLikes + anonymousLikes;
     await Article.findByIdAndUpdate(id, { likes: likesCount });
     result.totalLikes = likesCount;
+    // Like.toggleLike renvoie userHasLiked, AnonymousLike renvoie liked
+    result.liked = result.liked ?? result.action === 'liked';
 
     res.status(200).json({
       status: 'success',

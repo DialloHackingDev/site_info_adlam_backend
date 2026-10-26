@@ -76,6 +76,12 @@ const commentSchema = new mongoose.Schema({
   isReported: {
     type: Boolean,
     default: false
+  },
+  // Auteurs des signalements (id utilisateur ou IP) : un seul signalement chacun
+  reportedBy: {
+    type: [String],
+    select: false,
+    default: []
   }
 }, {
   timestamps: true
@@ -129,9 +135,19 @@ commentSchema.methods.markAsEdited = function() {
   return this.save();
 };
 
-commentSchema.methods.report = function() {
+// Au-delà de ce seuil, le commentaire est masqué en attendant la modération
+const REPORTS_BEFORE_HIDING = 3;
+
+commentSchema.methods.report = function(reporterKey) {
+  if (this.reportedBy.includes(reporterKey)) {
+    return Promise.resolve(this);
+  }
+  this.reportedBy.push(reporterKey);
   this.reportCount += 1;
   this.isReported = true;
+  if (this.reportCount >= REPORTS_BEFORE_HIDING && this.status === 'approved') {
+    this.status = 'pending';
+  }
   return this.save();
 };
 

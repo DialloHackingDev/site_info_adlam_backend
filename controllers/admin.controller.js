@@ -1,8 +1,8 @@
 const Article = require('../models/article.model');
 const Ebook = require('../models/ebook.model');
 const User = require('../models/users.model');
-const { cloudinary } = require('../config/cloudinary');
 const EbookFileService = require('../services/ebook-file.service');
+const storage = require('../services/storage.service');
 
 // Statistiques du dashboard
 exports.getDashboardStats = async (req, res) => {
@@ -46,25 +46,16 @@ exports.createArticle = async (req, res) => {
 
     const articleData = { ...req.body, author: req.user._id };
 
-    // Upload de l'image de couverture sur Cloudinary
+    // Image de couverture (Cloudinary, ou dossier uploads/ en développement)
     if (req.file) {
       try {
-        const result = await new Promise((resolve, reject) => {
-          cloudinary.uploader.upload_stream({
-            folder: 'adlam/articles',
-            resource_type: 'image'
-          }, (error, result) => {
-            if (error) reject(error);
-            else resolve(result);
-          }).end(req.file.buffer);
-        });
-        
-        articleData.coverImage = result.secure_url;
-        articleData.coverImagePublicId = result.public_id;
+        const image = await storage.uploadImage(req.file, 'adlam/articles');
+        articleData.coverImage = image.url;
+        articleData.coverImagePublicId = image.publicId;
       } catch (uploadError) {
-        return res.status(400).json({
+        return res.status(uploadError.statusCode || 400).json({
           status: 'error',
-          message: 'Erreur lors de l\'upload de l\'image: ' + uploadError.message
+          message: 'Erreur lors de l\'upload de l\'image : ' + uploadError.message
         });
       }
     }
@@ -95,7 +86,8 @@ exports.createArticle = async (req, res) => {
     }
 
     // Traiter les tags
-    if (articleData.tags) {
+    // Chaîne vide = liste vidée volontairement
+    if (articleData.tags !== undefined) {
       if (typeof articleData.tags === 'string') {
         articleData.tags = articleData.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
       } else if (Array.isArray(articleData.tags)) {
@@ -104,7 +96,8 @@ exports.createArticle = async (req, res) => {
     }
 
     // Traiter les keywords
-    if (articleData.keywords) {
+    // Chaîne vide = liste vidée volontairement
+    if (articleData.keywords !== undefined) {
       if (typeof articleData.keywords === 'string') {
         articleData.keywords = articleData.keywords.split(',').map(k => k.trim()).filter(k => k);
       } else if (Array.isArray(articleData.keywords)) {
@@ -136,7 +129,8 @@ exports.updateArticle = async (req, res) => {
     const updateData = { ...req.body };
 
     // Traiter les tags
-    if (updateData.tags) {
+    // Chaîne vide = liste vidée volontairement
+    if (updateData.tags !== undefined) {
       if (typeof updateData.tags === 'string') {
         updateData.tags = updateData.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
       } else if (Array.isArray(updateData.tags)) {
@@ -145,7 +139,8 @@ exports.updateArticle = async (req, res) => {
     }
 
     // Traiter les keywords
-    if (updateData.keywords) {
+    // Chaîne vide = liste vidée volontairement
+    if (updateData.keywords !== undefined) {
       if (typeof updateData.keywords === 'string') {
         updateData.keywords = updateData.keywords.split(',').map(k => k.trim()).filter(k => k);
       } else if (Array.isArray(updateData.keywords)) {
@@ -153,27 +148,18 @@ exports.updateArticle = async (req, res) => {
       }
     }
 
-    // Upload nouvelle image si fournie
+    // Nouvelle image : envoyée d'abord, l'ancienne n'est supprimée qu'après succès
     if (req.file) {
       const article = await Article.findById(req.params.id);
-
-      // Supprimer l'ancienne image
-      if (article.coverImagePublicId) {
-        await cloudinary.uploader.destroy(article.coverImagePublicId);
+      if (!article) {
+        return res.status(404).json({ status: 'error', message: 'Article non trouvé' });
       }
 
-      const result = await new Promise((resolve, reject) => {
-        cloudinary.uploader.upload_stream({
-          folder: 'adlam/articles',
-          resource_type: 'image'
-        }, (error, result) => {
-          if (error) reject(error);
-          else resolve(result);
-        }).end(req.file.buffer);
-      });
-      
-      updateData.coverImage = result.secure_url;
-      updateData.coverImagePublicId = result.public_id;
+      const image = await storage.uploadImage(req.file, 'adlam/articles');
+      await storage.removeFile({ url: article.coverImage, publicId: article.coverImagePublicId });
+
+      updateData.coverImage = image.url;
+      updateData.coverImagePublicId = image.publicId;
     }
 
     const article = await Article.findByIdAndUpdate(
@@ -213,14 +199,7 @@ exports.deleteArticle = async (req, res) => {
       });
     }
 
-    // Supprimer l'image de Cloudinary si elle existe
-    if (article.coverImagePublicId && article.coverImagePublicId !== 'placeholder') {
-      try {
-        await cloudinary.uploader.destroy(article.coverImagePublicId);
-      } catch (deleteError) {
-        console.warn('Erreur suppression image:', deleteError.message);
-      }
-    }
+    await storage.removeFile({ url: article.coverImage, publicId: article.coverImagePublicId });
 
     await Article.findByIdAndDelete(req.params.id);
 
@@ -284,7 +263,8 @@ exports.createEbook = async (req, res) => {
     }
     
     // Traiter les tags
-    if (ebookData.tags) {
+    // Chaîne vide = liste vidée volontairement
+    if (ebookData.tags !== undefined) {
       if (typeof ebookData.tags === 'string') {
         ebookData.tags = ebookData.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
       } else if (Array.isArray(ebookData.tags)) {
@@ -293,7 +273,8 @@ exports.createEbook = async (req, res) => {
     }
 
     // Traiter les keywords
-    if (ebookData.keywords) {
+    // Chaîne vide = liste vidée volontairement
+    if (ebookData.keywords !== undefined) {
       if (typeof ebookData.keywords === 'string') {
         ebookData.keywords = ebookData.keywords.split(',').map(k => k.trim()).filter(k => k);
       } else if (Array.isArray(ebookData.keywords)) {
@@ -306,44 +287,23 @@ exports.createEbook = async (req, res) => {
       try {
         // Upload image de couverture sur Cloudinary
         if (req.files.coverImage && req.files.coverImage[0]) {
-          const coverFile = req.files.coverImage[0];
-          const coverResult = await new Promise((resolve, reject) => {
-            cloudinary.uploader.upload_stream({
-              folder: 'adlam/ebooks/covers',
-              resource_type: 'image'
-            }, (error, result) => {
-              if (error) reject(error);
-              else resolve(result);
-            }).end(coverFile.buffer);
-          });
-          
-          ebookData.coverImage = coverResult.secure_url;
-          ebookData.coverImagePublicId = coverResult.public_id;
+          const cover = await storage.uploadImage(req.files.coverImage[0], 'adlam/ebooks/covers');
+          ebookData.coverImage = cover.url;
+          ebookData.coverImagePublicId = cover.publicId;
         }
-        
-        // Upload fichier PDF sur Cloudinary
+
         if (req.files.pdfFile && req.files.pdfFile[0]) {
           const pdfFile = req.files.pdfFile[0];
-          const pdfResult = await new Promise((resolve, reject) => {
-            cloudinary.uploader.upload_stream({
-              folder: 'adlam/ebooks/pdfs',
-              resource_type: 'raw',
-              type: 'authenticated'
-            }, (error, result) => {
-              if (error) reject(error);
-              else resolve(result);
-            }).end(pdfFile.buffer);
-          });
-          
-          ebookData.pdfFile = pdfResult.secure_url;
-          ebookData.pdfFilePublicId = pdfResult.public_id;
+          const pdf = await storage.uploadPdf(pdfFile);
+          ebookData.pdfFile = pdf.url;
+          ebookData.pdfFilePublicId = pdf.publicId;
           ebookData.fileSize = pdfFile.size;
         }
-        
+
       } catch (fileError) {
-        return res.status(400).json({
+        return res.status(fileError.statusCode || 400).json({
           status: 'error',
-          message: 'Erreur lors du traitement des fichiers: ' + fileError.message
+          message: 'Erreur lors du traitement des fichiers : ' + fileError.message
         });
       }
     }
@@ -382,7 +342,8 @@ exports.updateEbook = async (req, res) => {
     }
 
     // Traiter les tags
-    if (updateData.tags) {
+    // Chaîne vide = liste vidée volontairement
+    if (updateData.tags !== undefined) {
       if (typeof updateData.tags === 'string') {
         updateData.tags = updateData.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
       } else if (Array.isArray(updateData.tags)) {
@@ -391,7 +352,8 @@ exports.updateEbook = async (req, res) => {
     }
 
     // Traiter les keywords
-    if (updateData.keywords) {
+    // Chaîne vide = liste vidée volontairement
+    if (updateData.keywords !== undefined) {
       if (typeof updateData.keywords === 'string') {
         updateData.keywords = updateData.keywords.split(',').map(k => k.trim()).filter(k => k);
       } else if (Array.isArray(updateData.keywords)) {
@@ -399,48 +361,33 @@ exports.updateEbook = async (req, res) => {
       }
     }
 
-    // Upload nouvelle image de couverture
-    if (req.files?.coverImage) {
-      if (ebook.coverImagePublicId) {
-        await cloudinary.uploader.destroy(ebook.coverImagePublicId);
-      }
-
-      const coverResult = await new Promise((resolve, reject) => {
-        cloudinary.uploader.upload_stream({
-          folder: 'adlam/ebooks/covers',
-          resource_type: 'image'
-        }, (error, result) => {
-          if (error) reject(error);
-          else resolve(result);
-        }).end(req.files.coverImage[0].buffer);
-      });
-      
-      updateData.coverImage = coverResult.secure_url;
-      updateData.coverImagePublicId = coverResult.public_id;
+    // Nombre de pages (le formulaire envoie 'pages', le modèle stocke 'pageCount')
+    if (updateData.pages !== undefined) {
+      const pages = parseInt(updateData.pages, 10);
+      if (pages > 0) updateData.pageCount = pages;
+      delete updateData.pages;
     }
 
-    // Upload nouveau fichier PDF
-    if (req.files?.pdfFile) {
-      if (ebook.pdfFilePublicId) {
-        await cloudinary.uploader.destroy(ebook.pdfFilePublicId, {
-          resource_type: 'raw',
-          type: EbookFileService.getPdfDeliveryType(ebook.pdfFile)
-        });
-      }
+    // Nouveaux fichiers : envoyés d'abord, les anciens supprimés seulement après succès
+    if (req.files?.coverImage) {
+      const cover = await storage.uploadImage(req.files.coverImage[0], 'adlam/ebooks/covers');
+      await storage.removeFile({ url: ebook.coverImage, publicId: ebook.coverImagePublicId });
+      updateData.coverImage = cover.url;
+      updateData.coverImagePublicId = cover.publicId;
+    }
 
-      const pdfResult = await new Promise((resolve, reject) => {
-        cloudinary.uploader.upload_stream({
-          folder: 'adlam/ebooks/pdfs',
-          resource_type: 'raw',
-          type: 'authenticated'
-        }, (error, result) => {
-          if (error) reject(error);
-          else resolve(result);
-        }).end(req.files.pdfFile[0].buffer);
+    if (req.files?.pdfFile) {
+      const pdfFile = req.files.pdfFile[0];
+      const pdf = await storage.uploadPdf(pdfFile);
+      await storage.removeFile({
+        url: ebook.pdfFile,
+        publicId: ebook.pdfFilePublicId,
+        resourceType: 'raw',
+        deliveryType: EbookFileService.getPdfDeliveryType(ebook.pdfFile)
       });
-      
-      updateData.pdfFile = pdfResult.secure_url;
-      updateData.pdfFilePublicId = pdfResult.public_id;
+      updateData.pdfFile = pdf.url;
+      updateData.pdfFilePublicId = pdf.publicId;
+      updateData.fileSize = pdfFile.size;
     }
 
     const updatedEbook = await Ebook.findByIdAndUpdate(
@@ -473,25 +420,13 @@ exports.deleteEbook = async (req, res) => {
       });
     }
 
-    // Supprimer les fichiers de Cloudinary
-    if (ebook.coverImagePublicId && ebook.coverImagePublicId !== 'placeholder') {
-      try {
-        await cloudinary.uploader.destroy(ebook.coverImagePublicId);
-      } catch (deleteError) {
-        console.warn('Erreur suppression couverture:', deleteError.message);
-      }
-    }
-    
-    if (ebook.pdfFilePublicId && ebook.pdfFilePublicId !== 'placeholder') {
-      try {
-        await cloudinary.uploader.destroy(ebook.pdfFilePublicId, {
-          resource_type: 'raw',
-          type: EbookFileService.getPdfDeliveryType(ebook.pdfFile)
-        });
-      } catch (deleteError) {
-        console.warn('Erreur suppression PDF:', deleteError.message);
-      }
-    }
+    await storage.removeFile({ url: ebook.coverImage, publicId: ebook.coverImagePublicId });
+    await storage.removeFile({
+      url: ebook.pdfFile,
+      publicId: ebook.pdfFilePublicId,
+      resourceType: 'raw',
+      deliveryType: EbookFileService.getPdfDeliveryType(ebook.pdfFile)
+    });
 
     await Ebook.findByIdAndDelete(req.params.id);
 

@@ -132,19 +132,27 @@ exports.getArticleComments = async (req, res) => {
       replies: 0
     };
 
-    // Si utilisateur connecté, vérifier ses likes
+    // Likes du lecteur (connecté ou anonyme), clés au format 'Comment_<id>'
     let userLikes = {};
-    if (req.user) {
-      const allCommentIds = [];
-      commentsWithReplies.forEach(comment => {
-        allCommentIds.push({ type: 'Comment', id: comment._id });
-        comment.replies.forEach(reply => {
-          allCommentIds.push({ type: 'Comment', id: reply._id });
-        });
+    const allCommentIds = [];
+    commentsWithReplies.forEach(comment => {
+      allCommentIds.push({ type: 'Comment', id: comment._id });
+      comment.replies.forEach(reply => {
+        allCommentIds.push({ type: 'Comment', id: reply._id });
       });
-      
-      if (allCommentIds.length > 0) {
+    });
+
+    if (allCommentIds.length > 0) {
+      if (req.user) {
         userLikes = await Like.checkUserLikes(req.user._id, allCommentIds);
+      } else if (req.sessionID) {
+        const anonymousLikes = await AnonymousLike.find({
+          targetType: 'Comment',
+          targetId: { $in: allCommentIds.map(c => c.id) },
+          ipAddress: req.ip,
+          sessionId: req.sessionID
+        }).select('targetId');
+        anonymousLikes.forEach(like => { userLikes[`Comment_${like.targetId}`] = true; });
       }
     }
 
@@ -299,18 +307,20 @@ exports.toggleCommentLike = async (req, res) => {
     let result;
     
     if (req.user) {
-      // Utilisateur connecté (admin) - utiliser l'ancien système
       result = await Like.toggleLike(req.user._id, 'Comment', id, ipAddress);
     } else {
-      // Visiteur anonyme - utiliser le nouveau système
       result = await AnonymousLike.toggleLike('Comment', id, ipAddress, sessionId, userAgent);
-      
-      // Mettre à jour le compteur dans le commentaire
-      const likesCount = await AnonymousLike.getLikesCount('Comment', id);
-      await Comment.findByIdAndUpdate(id, { likes: likesCount });
-      
-      result.totalLikes = likesCount;
     }
+
+    // Le compteur additionne les likes connectés et anonymes
+    const [userLikes, anonymousLikes] = await Promise.all([
+      Like.countDocuments({ targetType: 'Comment', targetId: id }),
+      AnonymousLike.getLikesCount('Comment', id)
+    ]);
+    const likesCount = userLikes + anonymousLikes;
+    await Comment.findByIdAndUpdate(id, { likes: likesCount });
+    result.totalLikes = likesCount;
+    result.liked = result.liked ?? result.action === 'liked';
 
     res.status(200).json({
       status: 'success',
@@ -330,7 +340,7 @@ exports.reportComment = async (req, res) => {
     const { id } = req.params;
     const { reason } = req.body;
 
-    const comment = await Comment.findById(id);
+    const comment = await Comment.findById(id).select('+reportedBy');
     if (!comment) {
       return res.status(404).json({
         status: 'error',
@@ -338,7 +348,8 @@ exports.reportComment = async (req, res) => {
       });
     }
 
-    await comment.report();
+    // L'IP plutôt que la session (modifiable par le client) pour les visiteurs anonymes
+    await comment.report(req.user ? `user:${req.user._id}` : `ip:${req.ip}`);
 
     res.status(200).json({
       status: 'success',

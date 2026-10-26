@@ -34,7 +34,7 @@ router.post('/', commentLimiter, optionalAuth, sanitizeAnonymousInput, validateA
 router.patch('/:id/like', optionalAuth, commentController.toggleCommentLike);
 
 // Signalement (public)
-router.post('/:id/report', commentController.reportComment);
+router.post('/:id/report', commentLimiter, optionalAuth, commentController.reportComment);
 
 // Routes admin uniquement
 router.patch('/:id', protect, adminOnly, validateCommentUpdate, commentController.updateComment);
