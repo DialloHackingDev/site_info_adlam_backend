@@ -11,7 +11,7 @@ const signToken = (id) => {
 
 exports.register = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password } = req.body;
     
     // Validation des types pour prévenir l'injection NoSQL
     if (!name || !email || !password || 
@@ -24,13 +24,9 @@ exports.register = async (req, res) => {
       });
     }
     
-    // Créer l'utilisateur avec le rôle spécifié (admin si fourni)
-    const userData = { name, email, password };
-    if (role && (role === 'admin' || role === 'user')) {
-      userData.role = role;
-    }
-    
-    const newUser = await User.create(userData);
+    // Le rôle n'est jamais accepté depuis le client : toute inscription crée un 'user'.
+    // Les admins se promeuvent via /api/v1/admin/users/:id
+    const newUser = await User.create({ name, email, password });
 
     const token = signToken(newUser._id);
 
@@ -122,6 +118,16 @@ exports.login = async (req, res) => {
       message: 'Erreur serveur lors de la connexion'
     });
   }
+};
+
+// Déconnexion : supprimer le cookie JWT
+exports.logout = (req, res) => {
+  res.clearCookie('jwt', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict'
+  });
+  res.status(200).json({ status: 'success' });
 };
 
 // Obtenir l'utilisateur actuel (profil)

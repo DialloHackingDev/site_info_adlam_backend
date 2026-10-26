@@ -54,7 +54,7 @@ exports.createArticle = async (req, res) => {
     }
 
     const article = await Article.create(articleData);
-    await article.populate('author', 'name email');
+    await article.populate('author', 'name');
 
     res.status(201).json({
       status: 'success',
@@ -106,11 +106,12 @@ exports.getAllArticles = async (req, res) => {
       query.category = category;
     }
     
-    if (status) {
-      query.status = status;
-    } else if (!req.user || req.user.role !== 'admin') {
-      // Les non-admins ne voient que les articles publiés
+    const isAdmin = req.user && req.user.role === 'admin';
+    if (!isAdmin) {
+      // Les non-admins ne voient que les articles publiés, quel que soit le filtre demandé
       query.status = 'published';
+    } else if (status) {
+      query.status = status;
     }
 
 
@@ -131,7 +132,7 @@ exports.getAllArticles = async (req, res) => {
     } else {
       // Requête normale
       articles = await Article.find(query)
-        .populate('author', 'name email')
+        .populate('author', 'name')
         .sort({ [sort]: sortOrder })
         .limit(parseInt(limit))
         .skip(skip);
@@ -293,7 +294,7 @@ exports.updateArticle = async (req, res) => {
       id,
       updates,
       { new: true, runValidators: true }
-    ).populate('author', 'name email');
+    ).populate('author', 'name');
 
     res.status(200).json({
       status: 'success',

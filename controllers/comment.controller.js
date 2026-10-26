@@ -73,12 +73,15 @@ exports.createComment = async (req, res) => {
     
     // Populate selon le type de commentaire
     if (comment.author) {
-      await comment.populate('author', 'name email');
+      await comment.populate('author', 'name');
     }
+
+    // select: false ne s'applique pas au document créé
+    const { authorEmail: _email, ipAddress: _ip, ...publicComment } = comment.toObject();
 
     res.status(201).json({
       status: 'success',
-      data: { comment }
+      data: { comment: publicComment }
     });
   } catch (error) {
     res.status(400).json({
@@ -226,7 +229,7 @@ exports.updateComment = async (req, res) => {
     await comment.markAsEdited();
     
     if (comment.author) {
-      await comment.populate('author', 'name email');
+      await comment.populate('author', 'name');
     }
 
     res.status(200).json({

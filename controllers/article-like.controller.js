@@ -28,12 +28,16 @@ exports.toggleArticleLike = async (req, res) => {
       // Visiteur anonyme - utiliser le nouveau système
       result = await AnonymousLike.toggleLike('Article', id, ipAddress, sessionId, userAgent);
       
-      // Mettre à jour le compteur dans l'article
-      const likesCount = await AnonymousLike.getLikesCount('Article', id);
-      await Article.findByIdAndUpdate(id, { likes: likesCount });
-      
-      result.totalLikes = likesCount;
     }
+
+    // Le compteur de l'article additionne les likes connectés et anonymes
+    const [userLikes, anonymousLikes] = await Promise.all([
+      Like.countDocuments({ targetType: 'Article', targetId: id }),
+      AnonymousLike.getLikesCount('Article', id)
+    ]);
+    const likesCount = userLikes + anonymousLikes;
+    await Article.findByIdAndUpdate(id, { likes: likesCount });
+    result.totalLikes = likesCount;
 
     res.status(200).json({
       status: 'success',

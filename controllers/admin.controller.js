@@ -2,6 +2,7 @@ const Article = require('../models/article.model');
 const Ebook = require('../models/ebook.model');
 const User = require('../models/users.model');
 const { cloudinary } = require('../config/cloudinary');
+const EbookFileService = require('../services/ebook-file.service');
 
 // Statistiques du dashboard
 exports.getDashboardStats = async (req, res) => {
@@ -14,8 +15,9 @@ exports.getDashboardStats = async (req, res) => {
     ]);
 
     // Calculer les revenus (simulation)
+    // Revenus réels : somme des ventes enregistrées sur chaque e-book
     const totalRevenue = await Ebook.aggregate([
-      { $group: { _id: null, total: { $sum: '$price' } } }
+      { $group: { _id: null, total: { $sum: '$revenue' } } }
     ]);
 
     res.status(200).json({
@@ -267,11 +269,9 @@ exports.createEbook = async (req, res) => {
       ebookData.category = categoryMap[ebookData.category];
     }
     
-    // Corriger la langue
-    if (ebookData.language === 'fulani' || ebookData.language === 'pular') {
-      ebookData.language = 'french'; // Temporairement, utiliser 'french' au lieu de 'pular'
-    } else if (!ebookData.language) {
-      ebookData.language = 'french'; // Valeur par défaut
+    // Le front envoie 'fulani' ; le modèle attend 'pular'
+    if (!ebookData.language || ebookData.language === 'fulani') {
+      ebookData.language = 'pular';
     }
     
     // Convertir les nombres
@@ -327,7 +327,8 @@ exports.createEbook = async (req, res) => {
           const pdfResult = await new Promise((resolve, reject) => {
             cloudinary.uploader.upload_stream({
               folder: 'adlam/ebooks/pdfs',
-              resource_type: 'raw'
+              resource_type: 'raw',
+              type: 'authenticated'
             }, (error, result) => {
               if (error) reject(error);
               else resolve(result);
@@ -421,13 +422,17 @@ exports.updateEbook = async (req, res) => {
     // Upload nouveau fichier PDF
     if (req.files?.pdfFile) {
       if (ebook.pdfFilePublicId) {
-        await cloudinary.uploader.destroy(ebook.pdfFilePublicId, { resource_type: 'raw' });
+        await cloudinary.uploader.destroy(ebook.pdfFilePublicId, {
+          resource_type: 'raw',
+          type: EbookFileService.getPdfDeliveryType(ebook.pdfFile)
+        });
       }
 
       const pdfResult = await new Promise((resolve, reject) => {
         cloudinary.uploader.upload_stream({
           folder: 'adlam/ebooks/pdfs',
-          resource_type: 'raw'
+          resource_type: 'raw',
+          type: 'authenticated'
         }, (error, result) => {
           if (error) reject(error);
           else resolve(result);
@@ -479,7 +484,10 @@ exports.deleteEbook = async (req, res) => {
     
     if (ebook.pdfFilePublicId && ebook.pdfFilePublicId !== 'placeholder') {
       try {
-        await cloudinary.uploader.destroy(ebook.pdfFilePublicId, { resource_type: 'raw' });
+        await cloudinary.uploader.destroy(ebook.pdfFilePublicId, {
+          resource_type: 'raw',
+          type: EbookFileService.getPdfDeliveryType(ebook.pdfFile)
+        });
       } catch (deleteError) {
         console.warn('Erreur suppression PDF:', deleteError.message);
       }

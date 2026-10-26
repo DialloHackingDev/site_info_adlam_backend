@@ -126,18 +126,29 @@ const documentSchema = new mongoose.Schema({
 });
 
 // Index pour les recherches
-documentSchema.index({ title: 'text', description: 'text', tags: 'text' });
+// Même raison que pour les e-books : 'language' n'est pas une langue d'analyse MongoDB
+documentSchema.index(
+  { title: 'text', description: 'text', tags: 'text' },
+  { default_language: 'none', language_override: 'textSearchLanguage' }
+);
 documentSchema.index({ status: 1, publishedAt: -1 });
 documentSchema.index({ category: 1, status: 1 });
-documentSchema.index({ slug: 1 });
 documentSchema.index({ type: 1, status: 1 });
 
 // Middleware pour générer le slug automatiquement
-documentSchema.pre('save', async function(next) {
-  // Générer le slug si nouveau ou titre modifié
+// Mongoose 9 : pas de callback next
+documentSchema.pre('save', async function() {
+  // Générer le slug si nouveau ou titre modifié (unicité vérifiée parmi les documents)
   if (this.isNew || this.isModified('title')) {
     if (!this.slug || this.isModified('title')) {
-      this.slug = await SlugService.generateUniqueSlug(this.title, this._id);
+      const generated = SlugService.generateSlug(this.title);
+      const baseSlug = generated === 'article' ? 'document' : generated;
+      let slug = baseSlug;
+      let counter = 1;
+      while (await this.constructor.exists({ slug, _id: { $ne: this._id } })) {
+        slug = `${baseSlug}-${counter++}`;
+      }
+      this.slug = slug;
     }
   }
   
@@ -145,8 +156,6 @@ documentSchema.pre('save', async function(next) {
   if (this.isModified('status') && this.status === 'published' && !this.publishedAt) {
     this.publishedAt = new Date();
   }
-  
-  next();
 });
 
 // Méthodes d'instance

@@ -1,5 +1,13 @@
 const Stripe = require('stripe');
 
+// Devises sans sous-unité chez Stripe : le montant s'envoie tel quel (pas de x100)
+const ZERO_DECIMAL_CURRENCIES = ['gnf', 'xof', 'xaf', 'jpy', 'krw'];
+
+const toStripeAmount = (amount, currency = 'gnf') => {
+  const isZeroDecimal = ZERO_DECIMAL_CURRENCIES.includes(currency.toLowerCase());
+  return Math.round(isZeroDecimal ? amount : amount * 100);
+};
+
 // Vérifier que la clé Stripe est configurée
 if (!process.env.STRIPE_SECRET_KEY || 
     process.env.STRIPE_SECRET_KEY === 'sk_test_your_stripe_secret_key' ||
@@ -15,6 +23,7 @@ if (!process.env.STRIPE_SECRET_KEY ||
       getPaymentIntent: () => Promise.reject(new Error('Stripe non configuré')),
       createRefund: () => Promise.reject(new Error('Stripe non configuré')),
       constructWebhookEvent: () => { throw new Error('Stripe non configuré'); },
+      toStripeAmount,
       calculateFees: (amount) => ({ amount, percentageFee: 0, fixedFee: 0, totalFees: 0, netAmount: amount })
     }
   };
@@ -37,7 +46,7 @@ class StripeService {
   static async createPaymentIntent(amount, currency = 'gnf', metadata = {}) {
     try {
       const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(amount * 100), // Stripe utilise les centimes
+        amount: toStripeAmount(amount, currency),
         currency: currency.toLowerCase(),
         metadata,
         automatic_payment_methods: {
@@ -81,11 +90,11 @@ class StripeService {
   /**
    * Créer un remboursement
    */
-  static async createRefund(paymentIntentId, amount = null) {
+  static async createRefund(paymentIntentId, amount = null, currency = 'gnf') {
     try {
       const refundData = { payment_intent: paymentIntentId };
       if (amount) {
-        refundData.amount = Math.round(amount * 100);
+        refundData.amount = toStripeAmount(amount, currency);
       }
 
       const refund = await stripe.refunds.create(refundData);
@@ -117,6 +126,10 @@ class StripeService {
       console.error('Erreur webhook Stripe:', error);
       throw new Error(`Webhook invalide: ${error.message}`);
     }
+  }
+
+  static toStripeAmount(amount, currency) {
+    return toStripeAmount(amount, currency);
   }
 
   /**

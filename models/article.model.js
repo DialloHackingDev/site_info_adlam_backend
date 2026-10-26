@@ -128,6 +128,25 @@ articleSchema.index({ category: 1, status: 1 });
 //   }
 // });
 
+// Mongoose 9 : les hooks n'acceptent plus de callback next
+articleSchema.pre('validate', function () {
+  if (this.status === 'published' && !this.publishedAt) {
+    this.publishedAt = new Date();
+  }
+});
+
+// Même règle pour les mises à jour via findByIdAndUpdate (les hooks 'save' ne s'y appliquent pas)
+articleSchema.pre('findOneAndUpdate', async function () {
+  const update = this.getUpdate() || {};
+  const status = update.status ?? update.$set?.status;
+  if (status !== 'published') return;
+
+  const current = await this.model.findOne(this.getQuery()).select('publishedAt').lean();
+  if (current && !current.publishedAt) {
+    this.set({ publishedAt: new Date() });
+  }
+});
+
 // Méthodes d'instance
 articleSchema.methods.incrementViews = function () {
   this.views += 1;
@@ -170,7 +189,7 @@ articleSchema.statics.getPublished = function (options = {}) {
   }
 
   return this.find(query)
-    .populate('author', 'name email')
+    .populate('author', 'name')
     .sort(sort)
     .limit(limit)
     .skip(skip);
@@ -178,7 +197,7 @@ articleSchema.statics.getPublished = function (options = {}) {
 
 articleSchema.statics.getRecent = function (limit = 5) {
   return this.find({ status: 'published' })
-    .populate('author', 'name email')
+    .populate('author', 'name')
     .sort({ publishedAt: -1 })
     .limit(limit)
     .select('title slug excerpt coverImage category publishedAt views likes readingTime featured');
@@ -186,7 +205,7 @@ articleSchema.statics.getRecent = function (limit = 5) {
 
 articleSchema.statics.getFeatured = function (limit = 3) {
   return this.find({ status: 'published', featured: true })
-    .populate('author', 'name email')
+    .populate('author', 'name')
     .sort({ publishedAt: -1 })
     .limit(limit);
 };
@@ -199,7 +218,7 @@ articleSchema.statics.getPopular = function (limit = 5, days = 7) {
     status: 'published',
     publishedAt: { $gte: dateLimit }
   })
-    .populate('author', 'name email')
+    .populate('author', 'name')
     .sort({ views: -1, likes: -1 })
     .limit(limit);
 };
@@ -211,7 +230,7 @@ articleSchema.statics.getByCategory = function (category, options = {}) {
     status: 'published',
     category
   })
-    .populate('author', 'name email')
+    .populate('author', 'name')
     .sort({ publishedAt: -1 })
     .limit(limit)
     .skip(skip);
@@ -230,7 +249,7 @@ articleSchema.statics.searchArticles = function (searchTerm, options = {}) {
   }
 
   return this.find(query, { score: { $meta: 'textScore' } })
-    .populate('author', 'name email')
+    .populate('author', 'name')
     .sort({ score: { $meta: 'textScore' } })
     .limit(limit)
     .skip(skip);

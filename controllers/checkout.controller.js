@@ -1,8 +1,11 @@
 const Cart = require('../models/cart.model');
 const Order = require('../models/order.model');
 const Ebook = require('../models/ebook.model');
-const { StripeService } = require('../config/stripe');
+const { stripe, StripeService } = require('../config/stripe');
 const EbookFileService = require('../services/ebook-file.service');
+
+// Le mode simulation (paiement accepté sans encaissement) doit être activé explicitement
+const isSimulationEnabled = () => process.env.PAYMENT_SIMULATION === 'true';
 
 // Créer une session de checkout
 exports.createCheckoutSession = async (req, res) => {
@@ -28,8 +31,25 @@ exports.createCheckoutSession = async (req, res) => {
       });
     }
 
-    // Pour la simulation, générer un faux paymentIntentId
-    const paymentIntentId = `sim_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    let paymentIntentId;
+    let clientSecret = null;
+
+    if (stripe) {
+      const paymentIntent = await StripeService.createPaymentIntent(
+        cart.totalAmount,
+        cart.currency,
+        { userId: req.user._id.toString() }
+      );
+      paymentIntentId = paymentIntent.id;
+      clientSecret = paymentIntent.client_secret;
+    } else if (isSimulationEnabled()) {
+      paymentIntentId = `sim_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    } else {
+      return res.status(503).json({
+        status: 'error',
+        message: 'Le paiement en ligne n\'est pas disponible pour le moment'
+      });
+    }
 
     // Créer la commande
     const order = await Order.createFromCart(cart, req.user, paymentIntentId);
@@ -38,6 +58,8 @@ exports.createCheckoutSession = async (req, res) => {
       status: 'success',
       data: {
         paymentIntentId,
+        clientSecret,
+        simulation: !stripe,
         order: {
           id: order._id,
           orderNumber: order.orderNumber,
@@ -83,9 +105,45 @@ exports.confirmPayment = async (req, res) => {
       });
     }
 
-    // Pour la simulation, on considère le paiement comme réussi
-    // Marquer la commande comme payée
-    await order.markAsPaid('simulation');
+    // Commande déjà traitée (double clic, webhook passé avant) : ne rien recompter
+    if (order.status === 'completed') {
+      return res.status(200).json({
+        status: 'success',
+        message: 'Paiement déjà confirmé',
+        data: {
+          order: {
+            id: order._id,
+            orderNumber: order.orderNumber,
+            status: order.status,
+            total: order.total
+          }
+        }
+      });
+    }
+
+    let paymentMethod;
+    if (paymentIntentId.startsWith('sim_')) {
+      if (!isSimulationEnabled()) {
+        return res.status(402).json({
+          status: 'error',
+          message: 'Paiement non vérifié'
+        });
+      }
+      paymentMethod = 'simulation';
+    } else {
+      // Vérifier auprès de Stripe que le paiement a réellement abouti
+      const paymentIntent = await StripeService.getPaymentIntent(paymentIntentId);
+      if (paymentIntent.status !== 'succeeded' ||
+          paymentIntent.amount !== StripeService.toStripeAmount(order.total, order.currency)) {
+        return res.status(402).json({
+          status: 'error',
+          message: 'Paiement non abouti'
+        });
+      }
+      paymentMethod = paymentIntent.payment_method_types?.[0];
+    }
+
+    await order.markAsPaid(paymentMethod);
     
     // Générer les liens de téléchargement
     await generateDownloadLinks(order);
@@ -247,10 +305,7 @@ exports.downloadEbook = async (req, res) => {
         });
       }
 
-      const downloadUrl = EbookFileService.generateSecureDownloadUrl(
-        ebook.pdfFilePublicId,
-        24 * 60 * 60 // 24 heures
-      );
+      const downloadUrl = EbookFileService.generateSecureDownloadUrl(ebook._id);
 
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
       await order.addDownloadLink(ebookId, downloadUrl, expiresAt);
@@ -304,7 +359,7 @@ exports.getPurchasedEbooks = async (req, res) => {
           const ebookId = item.ebook._id.toString();
           if (!ebooksMap.has(ebookId)) {
             ebooksMap.set(ebookId, {
-              ...item.ebook.toObject(),
+              ...item.ebook.getPublicData(),
               purchaseDate: order.paidAt || order.createdAt,
               orderId: order._id,
               orderNumber: order.orderNumber
@@ -409,10 +464,7 @@ async function generateDownloadLinks(order) {
   for (const item of order.items) {
     const ebook = await Ebook.findById(item.ebook);
     if (ebook && ebook.pdfFilePublicId) {
-      const downloadUrl = EbookFileService.generateSecureDownloadUrl(
-        ebook.pdfFilePublicId,
-        24 * 60 * 60 // 24 heures
-      );
+      const downloadUrl = EbookFileService.generateSecureDownloadUrl(ebook._id);
       
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
       await order.addDownloadLink(item.ebook, downloadUrl, expiresAt);

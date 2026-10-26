@@ -186,7 +186,7 @@ const uploadDocumentThumbnail = multer({
 const uploadEbookFiles = multer({
   storage: multer.memoryStorage(), // Utiliser memoryStorage pour Cloudinary
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB pour les PDFs
+    fileSize: 10 * 1024 * 1024, // 10MB, aligné sur EbookFileService.validateFiles
     files: 2
   },
   fileFilter: (req, file, cb) => {

@@ -65,6 +65,7 @@ class EbookFileService {
         folder: 'adlam/ebooks/pdfs',
         public_id: `pdf_${Date.now()}_${filename.replace(/\.[^/.]+$/, '')}`,
         resource_type: 'raw',
+        type: 'authenticated', // Non accessible sans URL signée
         format: 'pdf'
       });
 
@@ -103,16 +104,16 @@ class EbookFileService {
   /**
    * Supprime un fichier de Cloudinary
    */
-  static async deleteFile(publicId, resourceType = 'image') {
+  static async deleteFile(publicId, resourceType = 'image', deliveryType = null) {
     try {
       if (!publicId) {
         console.warn('Aucun publicId fourni pour la suppression');
         return null;
       }
       
-      const result = await cloudinary.uploader.destroy(publicId, {
-        resource_type: resourceType
-      });
+      const options = { resource_type: resourceType };
+      if (deliveryType) options.type = deliveryType;
+      const result = await cloudinary.uploader.destroy(publicId, options);
       
       if (result.result === 'ok') {
         console.log(`Fichier ${publicId} supprimé avec succès`);
@@ -175,7 +176,7 @@ class EbookFileService {
         await this.deleteFile(results.cover.publicId).catch(console.error);
       }
       if (results.pdf?.publicId) {
-        await this.deleteFile(results.pdf.publicId, 'raw').catch(console.error);
+        await this.deleteFile(results.pdf.publicId, 'raw', 'authenticated').catch(console.error);
       }
       
       throw error;
@@ -228,7 +229,7 @@ class EbookFileService {
         await this.deleteFile(results.oldFiles.cover).catch(console.error);
       }
       if (results.pdf && results.oldFiles.pdf) {
-        await this.deleteFile(results.oldFiles.pdf, 'raw').catch(console.error);
+        await this.deleteFile(results.oldFiles.pdf, 'raw', this.getPdfDeliveryType(existingEbook.pdfFile)).catch(console.error);
       }
 
       return results;
@@ -238,7 +239,7 @@ class EbookFileService {
         await this.deleteFile(results.cover.publicId).catch(console.error);
       }
       if (results.pdf?.publicId) {
-        await this.deleteFile(results.pdf.publicId, 'raw').catch(console.error);
+        await this.deleteFile(results.pdf.publicId, 'raw', 'authenticated').catch(console.error);
       }
       
       throw error;
@@ -277,17 +278,35 @@ class EbookFileService {
   }
 
   /**
-   * Génère une URL de téléchargement sécurisée
+   * Type de livraison Cloudinary d'un PDF d'après son URL
+   * ('authenticated' pour les nouveaux uploads, 'upload' pour les anciens fichiers publics)
    */
-  static generateSecureDownloadUrl(publicId, expiresIn = 3600) {
-    try {
-      return cloudinary.utils.private_download_url(publicId, 'raw', {
-        expires_at: Math.floor(Date.now() / 1000) + expiresIn
+  static getPdfDeliveryType(pdfUrl) {
+    return pdfUrl && pdfUrl.includes('/raw/authenticated/') ? 'authenticated' : 'upload';
+  }
+
+  /**
+   * URL utilisable côté serveur pour récupérer le PDF d'un e-book.
+   * Ne jamais l'envoyer au client : pour un fichier 'authenticated' elle est signée.
+   */
+  static getPdfFetchUrl(ebook) {
+    if (this.getPdfDeliveryType(ebook.pdfFile) === 'authenticated' && ebook.pdfFilePublicId) {
+      return cloudinary.url(ebook.pdfFilePublicId, {
+        resource_type: 'raw',
+        type: 'authenticated',
+        sign_url: true,
+        secure: true
       });
-    } catch (error) {
-      console.error('Erreur génération URL sécurisée:', error);
-      return null;
     }
+    return ebook.pdfFile;
+  }
+
+  /**
+   * Lien de téléchargement remis à l'acheteur : l'endpoint de streaming,
+   * qui revérifie l'achat à chaque requête
+   */
+  static generateSecureDownloadUrl(ebookId) {
+    return `/api/v1/ebooks/${ebookId}/stream`;
   }
 }
 

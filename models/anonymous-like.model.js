@@ -31,6 +31,9 @@ const anonymousLikeSchema = new mongoose.Schema({
 anonymousLikeSchema.index({ targetType: 1, targetId: 1, ipAddress: 1, sessionId: 1 }, { unique: true });
 anonymousLikeSchema.index({ targetType: 1, targetId: 1 });
 
+// Plusieurs personnes peuvent partager une IP (famille, cybercafé), d'où une marge
+const MAX_LIKES_PER_IP = 5;
+
 // Méthodes statiques
 anonymousLikeSchema.statics.toggleLike = async function(targetType, targetId, ipAddress, sessionId, userAgent) {
   try {
@@ -46,6 +49,12 @@ anonymousLikeSchema.statics.toggleLike = async function(targetType, targetId, ip
       await this.deleteOne({ _id: existingLike._id });
       return { action: 'unliked', liked: false };
     } else {
+      // Le sessionId vient du client : plafonner par IP pour limiter le gonflage
+      const likesFromIp = await this.countDocuments({ targetType, targetId, ipAddress });
+      if (likesFromIp >= MAX_LIKES_PER_IP) {
+        return { action: 'limited', liked: false };
+      }
+
       // Ajouter le like
       await this.create({
         targetType,

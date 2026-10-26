@@ -70,6 +70,13 @@ async function handlePaymentSucceeded(paymentIntent) {
     
     // Marquer comme complétée
     await order.markAsCompleted();
+
+    // Vider le panier de l'acheteur
+    const Cart = require('../models/cart.model');
+    const cart = await Cart.findOne({ user: order.user });
+    if (cart) {
+      await cart.clear();
+    }
     
     // Mettre à jour les statistiques des e-books
     await updateEbookStats(order);
@@ -79,6 +86,8 @@ async function handlePaymentSucceeded(paymentIntent) {
     // await sendOrderConfirmationEmail(order);
     
   } catch (error) {
+    console.error('Erreur webhook Stripe:', error.message);
+    throw error; // Réponse 500 : Stripe renverra l'événement
   }
 }
 
@@ -99,6 +108,7 @@ async function handlePaymentFailed(paymentIntent) {
     // await sendPaymentFailedEmail(order);
     
   } catch (error) {
+    console.error('Erreur webhook Stripe:', error.message);
   }
 }
 
@@ -118,6 +128,7 @@ async function handlePaymentCanceled(paymentIntent) {
     
     
   } catch (error) {
+    console.error('Erreur webhook Stripe:', error.message);
   }
 }
 
@@ -131,6 +142,7 @@ async function handleChargeDispute(charge) {
     // - Préparer les documents de défense
     
   } catch (error) {
+    console.error('Erreur webhook Stripe:', error.message);
   }
 }
 
@@ -142,10 +154,7 @@ async function generateDownloadLinks(order) {
   for (const item of order.items) {
     const ebook = await Ebook.findById(item.ebook);
     if (ebook && ebook.pdfFilePublicId) {
-      const downloadUrl = EbookFileService.generateSecureDownloadUrl(
-        ebook.pdfFilePublicId,
-        24 * 60 * 60 // 24 heures
-      );
+      const downloadUrl = EbookFileService.generateSecureDownloadUrl(ebook._id);
       
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
       await order.addDownloadLink(item.ebook, downloadUrl, expiresAt);

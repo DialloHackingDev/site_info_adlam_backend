@@ -24,7 +24,8 @@ const commentSchema = new mongoose.Schema({
     type: String,
     required: function() { return !this.author; },
     lowercase: true,
-    trim: true
+    trim: true,
+    select: false // Donnée personnelle : jamais renvoyée par défaut
   },
   isAnonymous: {
     type: Boolean,
@@ -32,7 +33,8 @@ const commentSchema = new mongoose.Schema({
   },
   ipAddress: {
     type: String,
-    required: true
+    required: true,
+    select: false
   },
   article: {
     type: mongoose.Schema.Types.ObjectId,
@@ -85,7 +87,8 @@ commentSchema.index({ parentComment: 1, status: 1, createdAt: 1 });
 commentSchema.index({ author: 1, status: 1 });
 
 // Middleware pour valider la hiérarchie des commentaires
-commentSchema.pre('save', async function(next) {
+// Mongoose 9 : pas de callback next, une erreur levée annule la sauvegarde
+commentSchema.pre('save', async function() {
   // Définir si c'est un commentaire anonyme
   this.isAnonymous = !this.author;
   
@@ -93,12 +96,12 @@ commentSchema.pre('save', async function(next) {
     const parentComment = await this.constructor.findById(this.parentComment);
     
     if (!parentComment) {
-      return next(new Error('Commentaire parent non trouvé'));
+      throw new Error('Commentaire parent non trouvé');
     }
     
     // Vérifier que l'article est le même
     if (parentComment.article.toString() !== this.article.toString()) {
-      return next(new Error('Le commentaire parent doit être sur le même article'));
+      throw new Error('Le commentaire parent doit être sur le même article');
     }
     
     // Définir le niveau basé sur le parent
@@ -106,13 +109,11 @@ commentSchema.pre('save', async function(next) {
     
     // Limiter à 2 niveaux maximum
     if (this.level > 2) {
-      return next(new Error('Maximum 2 niveaux de réponses autorisés'));
+      throw new Error('Maximum 2 niveaux de réponses autorisés');
     }
   } else {
     this.level = 0;
   }
-  
-  next();
 });
 
 // Méthodes d'instance
@@ -158,7 +159,7 @@ commentSchema.statics.getByArticle = function(articleId, options = {}) {
     status: 'approved',
     parentComment: null // Seulement les commentaires principaux
   })
-    .populate('author', 'name email')
+    .populate('author', 'name')
     .sort(sort)
     .limit(limit)
     .skip(skip);
@@ -171,7 +172,7 @@ commentSchema.statics.getReplies = function(parentCommentId, options = {}) {
     parentComment: parentCommentId,
     status: 'approved'
   })
-    .populate('author', 'name email')
+    .populate('author', 'name')
     .sort(sort)
     .limit(limit);
 };
@@ -186,13 +187,15 @@ commentSchema.statics.getCommentThread = function(articleId, options = {}) {
         status: 'approved'
       }
     },
+    // Les agrégations ignorent select: false
+    { $project: { authorEmail: 0, ipAddress: 0 } },
     {
       $lookup: {
         from: 'users',
         localField: 'author',
         foreignField: '_id',
         as: 'author',
-        pipeline: [{ $project: { name: 1, email: 1 } }]
+        pipeline: [{ $project: { name: 1 } }]
       }
     },
     { $unwind: '$author' },
@@ -266,7 +269,9 @@ commentSchema.statics.getStats = function(articleId) {
 commentSchema.statics.getModerationQueue = function(options = {}) {
   const { status = 'pending', limit = 50, skip = 0 } = options;
   
+  // Réservé aux admins : email et IP utiles pour la modération
   return this.find({ status })
+    .select('+authorEmail +ipAddress')
     .populate('author', 'name email')
     .populate('article', 'title slug')
     .sort({ createdAt: -1 })

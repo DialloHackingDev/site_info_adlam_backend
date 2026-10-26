@@ -162,7 +162,12 @@ const ebookSchema = new mongoose.Schema({
 });
 
 // Index pour les recherches et performances
-ebookSchema.index({ title: 'text', description: 'text', author: 'text', tags: 'text' });
+// Le champ 'language' (pular, french...) ne doit pas servir de langue d'analyse MongoDB :
+// 'pular' n'est pas supporté et ferait échouer toute insertion
+ebookSchema.index(
+  { title: 'text', description: 'text', author: 'text', tags: 'text' },
+  { default_language: 'none', language_override: 'textSearchLanguage' }
+);
 ebookSchema.index({ status: 1, publishedAt: -1 });
 ebookSchema.index({ category: 1, status: 1 });
 ebookSchema.index({ price: 1, status: 1 });
@@ -191,6 +196,29 @@ ebookSchema.index({ featured: 1, status: 1 });
 //     next(error);
 //   }
 // });
+
+// Mongoose 9 : les hooks n'acceptent plus de callback next
+ebookSchema.pre('validate', function () {
+  if (!this.slug) {
+    this.slug = `ebook-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  }
+
+  if (this.status === 'published' && !this.publishedAt) {
+    this.publishedAt = new Date();
+  }
+});
+
+// Même règle pour les mises à jour via findByIdAndUpdate (les hooks 'save' ne s'y appliquent pas)
+ebookSchema.pre('findOneAndUpdate', async function () {
+  const update = this.getUpdate() || {};
+  const status = update.status ?? update.$set?.status;
+  if (status !== 'published') return;
+
+  const current = await this.model.findOne(this.getQuery()).select('publishedAt').lean();
+  if (current && !current.publishedAt) {
+    this.set({ publishedAt: new Date() });
+  }
+});
 
 // Méthodes d'instance
 ebookSchema.methods.incrementViews = function () {
@@ -228,6 +256,9 @@ ebookSchema.methods.getPublicData = function () {
   // Supprimer les données sensibles pour l'API publique
   delete ebook.pdfFilePublicId;
   delete ebook.coverImagePublicId;
+  // L'URL du PDF n'est jamais exposée : la lecture passe par /ebooks/:id/stream
+  delete ebook.pdfFile;
+  ebook.hasPdf = Boolean(this.pdfFile);
 
   // Ajouter les données calculées
   ebook.effectivePrice = this.getEffectivePrice();

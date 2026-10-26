@@ -14,6 +14,8 @@ const {
   validateAnonymousComment
 } = require('../middlewares');
 
+const { commentLimiter } = require('../middlewares/rateLimiter');
+
 const router = express.Router();
 
 // Middleware global
@@ -26,7 +28,7 @@ router.get('/article/:articleId', optionalAuth, commentController.getArticleComm
 router.get('/:commentId/replies', optionalAuth, commentController.getCommentReplies);
 
 // Création de commentaires (public avec auth optionnelle)
-router.post('/', optionalAuth, sanitizeAnonymousInput, validateAnonymousComment, commentController.createComment);
+router.post('/', commentLimiter, optionalAuth, sanitizeAnonymousInput, validateAnonymousComment, commentController.createComment);
 
 // Likes des commentaires (public avec auth optionnelle)
 router.patch('/:id/like', optionalAuth, commentController.toggleCommentLike);

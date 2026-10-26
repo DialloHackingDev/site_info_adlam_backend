@@ -53,7 +53,6 @@ const cartSchema = new mongoose.Schema({
 });
 
 // Index pour optimiser les requêtes
-cartSchema.index({ user: 1 });
 cartSchema.index({ 'items.ebook': 1 });
 
 // Middleware pour calculer les totaux automatiquement
@@ -155,8 +154,8 @@ cartSchema.methods.cleanInvalidItems = async function() {
   for (const item of this.items) {
     // Vérifier si l'ebook existe et est publié
     if (item.ebook && typeof item.ebook === 'object' && item.ebook.status === 'published') {
-      // Mettre à jour le prix si nécessaire
-      const currentPrice = item.ebook.discountPrice || item.ebook.price || 0;
+      // Mettre à jour le prix si nécessaire (une promo expirée ne s'applique plus)
+      const currentPrice = item.ebook.getEffectivePrice() || 0;
       
       if (item.price !== currentPrice) {
         item.price = currentPrice;

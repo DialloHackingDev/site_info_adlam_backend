@@ -475,7 +475,11 @@ exports.deleteEbook = async (req, res) => {
     }
     if (ebook.pdfFilePublicId) {
       try {
-        await EbookFileService.deleteFile(ebook.pdfFilePublicId, 'raw');
+        await EbookFileService.deleteFile(
+          ebook.pdfFilePublicId,
+          'raw',
+          EbookFileService.getPdfDeliveryType(ebook.pdfFile)
+        );
       } catch (deleteError) {
         console.error('Erreur suppression PDF:', deleteError);
       }
@@ -592,13 +596,12 @@ exports.generateDownloadUrl = async (req, res) => {
     // Incrémenter le compteur de téléchargements
     await ebook.incrementDownloads();
 
-    // Retourner l'URL du fichier (Cloudinary ou local)
+    // L'URL Cloudinary n'est pas exposée : le client passe par le streaming authentifié
     res.status(200).json({
       status: 'success',
       data: {
-        downloadUrl: ebook.pdfFile,
-        title: ebook.title,
-        expiresIn: 24 * 3600
+        downloadUrl: EbookFileService.generateSecureDownloadUrl(ebook._id),
+        title: ebook.title
       }
     });
   } catch (error) {
@@ -654,9 +657,7 @@ exports.streamPdf = async (req, res) => {
     // Vérifier si le fichier est sur Cloudinary ou local
     if (ebook.pdfFile.includes('cloudinary.com')) {
       // Fichier sur Cloudinary - streamer depuis Cloudinary
-      console.log('📄 Streaming PDF depuis Cloudinary:', ebook.pdfFile);
-      
-      const response = await axios.get(ebook.pdfFile, {
+      const response = await axios.get(EbookFileService.getPdfFetchUrl(ebook), {
         responseType: 'arraybuffer',
         headers: {
           'Accept': 'application/pdf',
@@ -670,16 +671,15 @@ exports.streamPdf = async (req, res) => {
       res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(ebook.title)}.pdf"`);
       res.setHeader('Content-Length', response.data.byteLength);
       res.setHeader('Accept-Ranges', 'bytes');
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET');
-      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.setHeader('Cache-Control', 'private, no-store');
 
       res.send(Buffer.from(response.data));
     } else {
       // Fichier local - servir depuis /uploads/
-      const filePath = path.join(__dirname, '..', ebook.pdfFile);
-      
-      if (!fs.existsSync(filePath)) {
+      const uploadsDir = path.resolve(__dirname, '..', 'uploads');
+      const filePath = path.resolve(__dirname, '..', ebook.pdfFile.replace(/^\//, ''));
+
+      if (!filePath.startsWith(uploadsDir + path.sep) || !fs.existsSync(filePath)) {
         return res.status(404).json({
           status: 'error',
           message: 'Fichier PDF introuvable'
@@ -688,9 +688,7 @@ exports.streamPdf = async (req, res) => {
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(ebook.title)}.pdf"`);
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET');
-      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.setHeader('Cache-Control', 'private, no-store');
 
       const fileStream = fs.createReadStream(filePath);
       fileStream.pipe(res);

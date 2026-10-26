@@ -21,7 +21,6 @@ const cartRouter = require('./routes/cart.route');
 const checkoutRouter = require('./routes/checkout.route');
 const shopRouter = require('./routes/shop.route');
 const adminRouter = require('./routes/admin.route');
-const adminUserRouter = require('./routes/admin.user.route');
 const documentRouter = require('./routes/document.route');
 const contactRouter = require('./routes/contact.route');
 
@@ -41,14 +40,17 @@ app.use(helmet({
 // Middleware de limitation de taille AVANT le parsing
 app.use(limitRequestSize('10mb'));
 
-// CORS - Configuration simplifiée pour déboguer
+// CORS - origines autorisées (CORS_ORIGINS permet d'en ajouter, séparées par des virgules)
 const allowedOrigins = [
   'https://yelaare.vercel.app',
   'https://adlam-fulani-front.vercel.app',
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'http://localhost:5175',
-  'http://localhost:5176'
+  ...(process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',').map(o => o.trim()) : []),
+  ...(process.env.NODE_ENV !== 'production' ? [
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:5175',
+    'http://localhost:5176'
+  ] : [])
 ];
 
 const corsOptions = {
@@ -60,12 +62,12 @@ const corsOptions = {
       callback(null, true);
     } else {
       console.log('❌ Origin bloquée:', origin);
-      callback(null, true); // Temporairement autoriser tout pour déboguer
+      callback(null, false);
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-Id'],
   exposedHeaders: ['Content-Length', 'X-Request-Id'],
   maxAge: 86400,
   optionsSuccessStatus: 204
@@ -85,7 +87,12 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // Configuration UTF-8 pour supporter les caractères Adlam
-app.use(express.json({ limit: '10mb', charset: 'utf-8' }));
+// Le webhook Stripe a besoin du body brut pour vérifier la signature (express.raw sur sa route)
+const jsonParser = express.json({ limit: '10mb', charset: 'utf-8' });
+app.use((req, res, next) => {
+  if (req.originalUrl === '/api/v1/checkout/webhook') return next();
+  jsonParser(req, res, next);
+});
 app.use(express.urlencoded({ extended: true, limit: '10mb', charset: 'utf-8' }));
 app.use(morgan("dev"));
 app.use(cookieParser());
@@ -93,17 +100,17 @@ app.use(cookieParser());
 // Middleware de validation Content-Type APRÈS le parsing
 app.use(validateContentType);
 
-// Servir les fichiers statiques du dossier uploads
+// Les PDF locaux ne sont jamais servis en statique : ils passent par /ebooks/:id/stream
+app.use('/uploads', (req, res, next) => {
+  if (/\.pdf$/i.test(req.path)) {
+    return res.status(404).end();
+  }
+  next();
+});
+
+// Servir les images du dossier uploads (express.static déduit le Content-Type de l'extension)
 app.use('/uploads', express.static('uploads', {
-  setHeaders: (res, path) => {
-    // Détecter le type de fichier
-    if (path.endsWith('.pdf')) {
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', 'inline');
-    } else if (path.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
-      res.setHeader('Content-Type', 'image/jpeg');
-    }
-    // Headers CORS pour permettre l'accès depuis le frontend
+  setHeaders: (res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET');
   }
@@ -120,7 +127,6 @@ app.use('/api/v1/cart', cartRouter);
 app.use('/api/v1/checkout', checkoutRouter);
 app.use('/api/v1/shop', shopRouter);
 app.use('/api/v1/admin', adminRouter);
-app.use('/api/v1/admin', adminUserRouter);
 app.use('/api/v1/documents', documentRouter);
 app.use('/api/v1/contact', contactRouter);
 
